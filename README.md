@@ -81,17 +81,10 @@ Note that if you don't want to "follow along" and instead you just want the code
 
 MIDI_CREATE_DEFAULT_INSTANCE();
 
-/**
-   Set up our MIDI field recorder
-*/
 void setup() {
   // we'll put some more code here in the next sections
 }
 
-/**
-   The "game loop" consists of checking whether we need to
-   perform any file management, and then checking for MIDI input.
-*/
 void loop() {
   // we'll put some more code here in the next sections
 }
