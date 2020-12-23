@@ -46,6 +46,8 @@ We set up MIDI-In on the Arduino `RX<-0` pin, with MIDI-Thru via the `TX->1` pin
 
 The SD card circuitry is literally just a matter of "connect the pins to the pins", with the only oddity being that the pins don't _quite_ line up well enough to literally just stick the SD card module directly into the Arduino.
 
+However, note that your SD card module **may have a different pin layout** so be sure to double-check before wiring things up!
+
 <img alt="SD module diagram" src="./sd card.png" width="50%">
 
 ### Adding a beep, for debugging
