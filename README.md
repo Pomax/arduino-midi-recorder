@@ -106,32 +106,33 @@ This sets up MIDI listening on all MIDI channels (there are sixteen of them, and
 That leaves implementing our MIDI event handling:
 
 ```c++
-#define NOTE_ON_EVENT 0x90
 #define NOTE_OFF_EVENT 0x80
-#define CONTROL_CHANGE_EVENT 0x90
+#define NOTE_ON_EVENT 0x90
+#define CONTROL_CHANGE_EVENT 0xB0
 #define PITCH_BEND_EVENT 0xE0
-
-void handleNoteOn(byte CHANNEL, byte pitch, byte velocity) {
-  byte event_type_on_channel = NOTE_ON_EVENT | CHANNEL;
-  write_to_file(event_type_on_channel, pitch, velocity);
-}
 
 void handleNoteOff(byte CHANNEL, byte pitch, byte velocity) {
   byte event_type_on_channel = NOTE_OFF_EVENT | CHANNEL;
   write_to_file(event_type_on_channel, pitch, velocity);
 }
 
-void handleControlChange(byte CHANNEL, byte controller_code, byte value) {
+void handleNoteOn(byte CHANNEL, byte pitch, byte velocity) {
+  byte event_type_on_channel = NOTE_ON_EVENT | CHANNEL;
+  write_to_file(event_type_on_channel, pitch, velocity);
+}
+
+void handleControlChange(byte CHANNEL, byte controller, byte value) {
   byte event_type_on_channel = CONTROL_CHANGE_EVENT | CHANNEL;
-  write_to_file(event_type_on_channel, controller_code, value);
+  write_to_file(event_type_on_channel, controller, value);
 }
 
 void handlePitchBend(byte CHANNEL, int bend_value) {
   byte event_type_on_channel = PITCH_BEND_EVENT | CHANNEL;
   
-  // per the MIDI spec, bend_value is 14 bits, and needs
-  // to be encoded in two bytes as two 7-bit values, the
-  // first the lowest 7 bits, and the second the high 7 bits:
+  // Per the MIDI spec, bend_value is 14 bits, and needs
+  // to be encoded as two 7-bit bytes, encoded as the
+  // lowest 7 bits in the first byte, and the highest 7
+  // bits in the second byte:
   byte low_7_bits = (byte) (bend_value & 0x7F);
   byte high_7_bits = (byte) ((bend_value >> 7) & 0x7F);
 
