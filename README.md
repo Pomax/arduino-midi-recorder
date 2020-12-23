@@ -223,6 +223,6 @@ Which means we can move on to actually writing MIDI data to a `.mid` file!
 
 # Comments and/or questions
 
-Hit up https://github.com/Pomax/arduino-midi-recorder/issues if you want to have a detailed conversation, or just tweet/toot at me on https://twitter.com/TheRealPomax or https://mastodon.social/@TheRealPomax if you want the kind of momentary engagement the internet seems to be for these days =)
+Hit up [the issue tracker](https://github.com/Pomax/arduino-midi-recorder/issues) if you want to have a detailed conversation, or just tweet/toot at me on [Twitter](https://twitter.com/TheRealPomax) or [Mastodon](https://mastodon.social/@TheRealPomax) if you want the kind of momentary engagement the internet seems to be for these days =)
 
-- Pomax
+— Pomax
