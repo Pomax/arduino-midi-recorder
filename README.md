@@ -165,7 +165,7 @@ This function seems bigger than it has to be: we _could_ just start the clock wh
 
 You may also have noticed that we're (a) using `micros()` instead of the more common `millis()`, and (b) we're not even using that value directly, we're scaling it so that our ticks are 1/10,000th of a second instead. The reason here is that the MIDI spec links "the number of ticks per quaver/quarter note" and "the time it takes to play a quaver/quarter note" based on microseconds: in our case, we'll be defining a quaver/quarter note as taking 390,000μs, spanning an interval of 4000 ticks. So, in order to make sure there's we're using the correct scale for the number of ticks, we'll need to divide `micros()` by 100.
 
-That then just leaves updating our handlers:
+That then leaves updating our handlers:
 
 ```c++
 void handleNoteOn(byte CHANNEL, byte pitch, byte velocity) {
