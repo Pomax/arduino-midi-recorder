@@ -19,7 +19,7 @@ You'd think this would be something that already exists as a product you can jus
    1. [MIDI handling](#midi-handling)
    1. [File management](#file-management)
    1. [Making some beeps](#making-some-beeps)
-   1. [idle handling](#autorestart)
+   1. [idle handling](#creating-a-new-file-when-idling)
 1. [Comments/questions](#comments-and-or-questions)
 
 ## The circuitry
@@ -45,7 +45,7 @@ We set up MIDI-In on the Arduino `RX<-0` pin, with MIDI-Thru tapping straight in
 
 <img alt="MIDI circuit diagram" src="./MIDI.png" width="75%">
 
-(I know, "thru isn't a word!" but that's what the MIDI spec calls it, so English gets to take a back seat here...)
+(I know, "Thru isn't a word!", but that's what [the MIDI spec](http://www.shclemen.com/download/The%20Complete%20MIDI1.0%20Detailed%20Spec.pdf#page=7&zoom=auto,-206,478) calls it, so English gets to take a back seat here...)
 
 ### The SD part of our recorder
 
@@ -206,17 +206,226 @@ Which means we can move on to actually writing MIDI data to a `.mid` file!
 
 ### File management
 
-...
+The `SD` library makes working with SD cards super easy, but of course we're still going to have to write all the code for creating file handles, and writing binary data into them. So first, some setup:
+
+```c++
+#define CHIP_SELECT 9
+
+String filename;
+File file;
+
+void setup() {
+  pinMode(CHIP_SELECT, OUTPUT);
+
+  if (SD.begin(CHIP_SELECT)) {
+    find_next_filename();
+    if (file) {
+      create_midi_file();
+    }
+  }
+}
+
+void find_next_filename() {
+  for (int i = 1; i < 1000; i++) {
+    filename = "file-";
+    if (i < 10) filename += "0";
+    if (i < 100) filename += "0";
+    filename += String(i);
+    filename += String(".mid");
+
+    if (!SD.exists(filename)) {
+      open_file();
+      return;
+    }
+  }
+}
+
+void open_file() {
+  if (file) file.close();
+  file = SD.open(filename, FILE_WRITE);
+}
+```
+
+Our initial setup is fairly straight forward: we tell the `SD` library that we'll be communicating to the SD card using pin 9, and then we try to create a new file to write to. There's a nuber of ways of which we can do this, but the simplest is "build a filename, see if it exists, if it doesn't: use that filename". In this case, we create a fliename with pattern `file-xxx.mid` where `xxx` ranges from `001` to `999` and we simply pick the first available filename. Another way to do this would be to use the Arduino's EEPROM to store a value so that we get a guaranteed new value each time the Arduino starts up, that would also mean that if we wipe the SD card and turn the Arduino on, we wouldn't start at `001` but some random nubmer, and frankly that's silly.
+
+So: while this is _also_ silly, it's less silly and we're rolling with it.
+
+Next, when we have a filename that works we open the file in `FILE_WRITE` mode, which --perhaps counter-intuitively-- means we'll be opening the file in `APPEND` mode: we have read/write access, but the file point is "stuck" at the end of the file and any data we write gets appended to what's already there. For MIDI files, which are essentially streams of events, that's exactly what we need, so we move on: we need to write a bit of boilerplate data into our new file, after which we can start dealing with recording actual MIDI events that we see flying by in the MIDI handlers we wrote in the previous section.
+
+```c++
+void create_midi_file() {
+  byte header[] = {
+    0x4D, 0x54, 0x68, 0x64,   // "MThd" chunk
+    0x00, 0x00, 0x00, 0x06,   // chunk length (from this point on): 6 bytes
+    0x00, 0x00,               // format: 0
+    0x00, 0x01,               // number of tracks: 1
+    0x0F, 0xA0                // data rate: 4000 ticks per quaver/quarter note
+  };
+  file.write(header, 14);
+
+  byte track[] = {
+    0x4D, 0x54, 0x72, 0x6B,   // "MTrk" chunk
+    0x00, 0x00, 0x00, 0x00    // chunk length placeholder
+  };
+  file.write(track, 8);
+
+  byte tempo[] = {
+    0x00,                     // time delta for the first MIDI event: zero
+    0xFF, 0x51, 0x03,         // MIDI event type: "tempo" instruction
+    0x05, 0xF3, 0x70          // tempo value: 390,000μs per quaver/quarter note
+  };
+  file.write(tempo, 7);
+}
+```
+
+Rather than explaining why we need this data, I will direct you to [The MIDI File Format](http://www.music.mcgill.ca/~ich/classes/mumt306/StandardMIDIfileformat.html) specification, but the short version is that this is all boiler plate bytecode if we want a single event stream MIDI file, with two custom values:
+
+1. we get to choose the data rate in the header, and we went with 4000 ticks per quaver/quarter note, and
+2. we also get to choose the "play speed", which we set a little under half a second per quaver/quarter note.
+
+You may also notice that we've set the track length to zero: normally this value gets set to the byte length of the track when you save a `.mid` file on, say, your computer, but we don't know what that length is yet. In fact, we're never going to make our code figure that out: we'll write a small [Python](https://python.org) script to help set that value only when it's important (e.g. when you're ready to import the data into whatever audio application you have that you want to load MIDI data into).
+
+And with that, it's time to get to the entire reason you're reading along: the code that writes incoming MIDI signals to our file: let's implement `write_to_file`:
+
+```c++
+void write_to_file(byte eventType, byte b1, byte b2, int delta) {
+  if (!file) return;
+  write_var_len(delta);
+  file.write(eventType);
+  file.write(b1);
+  file.write(b2);
+}
+```
+
+That's... that's not a lot of code. And the reason it's not a lot of code is that MIDI was intended to be super small both to send and to read/write. The only tricy part is the `write_var_len()` function, which turns integers into their corresponding byte sequences. Thankfully, the MIDI spec handily provides the code necessary to achieve this, so we simply adopt that for our Arduino program and we're good to go:
+
+```c++
+#define HAS_MORE_BYTES 0x80
+
+void write_var_len(unsigned long value) {
+  unsigned long buffer = value & 0x7f;
+
+  while ((value >>= 7) > 0) {
+    buffer <<= 8;
+    buffer |= HAS_MORE_BYTES;
+    buffer |= value & 0x7f;
+  }
+
+  while (true) {
+    file.write((byte)(buffer & 0xff));
+    if (buffer & HAS_MORE_BYTES) {
+      buffer >>= 8;
+    } else {
+      break;
+    }
+  }
+}
+```
+
+This allocates 4 bytes and then copies the input value in 7-bit chunks for each byte, with the byte's highest bit set to `0` if there's going to be another byte, or `1` if this is the last byte. This turns the input value into a buffer that has MSBF-ordered bits-per-byte, but LSBF-ordered bytes-per-buffer. The `while(true)` then writes those bytes to file in reverse, so they end up MSBF-ordered in the file. Nothing fancy, but just fancy enough to be fast.
 
 ### Making some beeps
 
-...
+With MIDI handling and file writing taken care of, one thing that's just a nice-to-have is being able to confirm that your MIDI event handling works, for which we're going to use our "speaker" and button for. First, we set up the code that lets us decide whether to beep, or not to beep:
 
-### Autorestart
+```c++
+#define AUDIO_DEBUG_PIN 2
 
-...
+int last_play_state = 0;
+bool play = false;
 
-# Comments and/or questions
+void setup() {
+  pinMode(AUDIO_DEBUG_PIN, INPUT);
+}
+
+void loop() {
+  set_play_state();
+}
+
+void set_play_state() {
+  int sig = digitalRead(AUDIO_DEBUG_PIN);
+  if (sig != last_play_state) {
+    last_play_state = sig;
+    if (sig == 1) play = !play;
+  }
+}
+```
+
+The only special thing that's going on here is that when we press our button, we want that the program to know that it can now play audio (or not), so we track whether we should make sound with the `play` boolean, and then during the program loop we check to see if there's a signal coming from our button. If there is, then we're pressing it, and we check whether we were previously _not_ pressing it. If that's true, we can toggle our `play` state. The reason we do this, rather than just toggling `play` when there's _any_ signal on our button, is that we _only_ want to toggle when the button goes down, not when you're hodling it down. If we did that, the `play` state would be flip-flopping between true and false every time `loop()` runs (32 thousand times a second!) for as long as you hold the button down. That'd be super weird!
+
+With that part covered, let's add some beeps so that when we press a key on our MIDI device, we hear the corresponding note in all its pristine, high quality piezo-buzz audio:
+
+```c++
+void handleNoteOn(byte CHANNEL, byte pitch, byte velocity) {
+  write_to_file(NOTE_ON_EVENT | CHANNEL, pitch, velocity, get_time_delta());
+  if (play) tone(AUDIO, 440 * pow(2, (pitch - 69.0) / 12.0), 100);
+}
+```
+
+Again, very little code, with the only surprise probably being that second argument for `tone()`: MIDI notes, while they claim to send a `pitch` value, actually send a pitch _identifier_, so rather than some audio frequency they say which "piano key" is active. To turn that into the corresponding audio frequency, we need to establish a few things:
+
+1. what kind of tuning system we want to use, and
+2. what the base frequency for A over middle C is.
+
+To keep things simple, because we're only writing this code for some debugging (and maybe fun), we'll use the standard [twelve tone equal temperament](https://en.wikipedia.org/wiki/12_equal_temperament) tuning, where every 12 note step doubles the audible frequency, with equal logarithmic steps from note to note, and a base frequency for A over middle C of [440 Herz](https://en.wikipedia.org/wiki/A440_(pitch_standard)). Of course, because there are _plenty_ of notes below A over middle C, we need to correct our pitch identifier for the MIDI pitch value for that key, which is 69, and so that gives us the formula:
+
+```
+                             (MIDI pitch - 69) / 12
+  frequency in Herz = 440 * 2
+
+```
+
+So now if we start our program, and we press our button, playing notes on our MIDI device will make the Arduino beep along with what we're playing. Of course, the `tone()` function can only play a single note at a time, so it's going to sound wonky if we play chords, but it'll beeping as best as it can.
+
+Beep, beep!
+
+### Creating a new file when idling 
+
+Finally, the whole point of this recorder is to record MIDI... not to record an hour of silence because you stopped playing and  went off to do something else for a bit. To that end, what we would like is for our program to detect that you've _not_ been playing anything for a while (say, a few minutes) and then stop recording, starting recording on a new file when you _do_ start playing again.
+
+As it so happens, the first part is _constantly_ true, because we're only writing to our file when new data comes in, and we've _also_ already implemented the second part: that happens automatically when you turn on the Arduino, so the only thing we're missing is a way to detect whether there's not been any input for a while:
+
+```c++
+#define RECORDING_TIMEOUT = 120000000
+// 2 minutes, counted in microseconds
+
+unsigned long last_loop_counter = 0;
+unsigned long loop_counter = 0;
+
+void loop() {
+  loop_counter = millis();
+  if (loop_counter - last_loop_counter > 400) {
+    check_reset();
+    last_loop_counter = loop_counter;
+    file.flush();
+  }
+}
+
+void check_reset() {
+  if (!file) return;
+  if (micros() - last_time > RECORDING_TIMEOUT) {
+    file.close();
+    if (start_time == 0) SD.remove(filename);
+    reset_arduino();
+  }
+}
+
+void(* reset_arduino) (void) = 0;
+```
+
+That might do more than you thought, so let's look at what's happening.
+
+First, we want to check whether any MIDI activity has happened during the program loop, but we _don't_ want to check that 32,150 times each second. So, instead, we set up some standard code to check every 400 milliseconds, where we check whether the difference between the `last_time` (which is the microsecond timestamp for the last MIDI event) and the current `micros()` value is more than 2 minutes, counted in microseconds. If it is, then we're just idling and we can restart the Arduino to start a new file. However, we don't want to create a million (or, hundreds, since we only allow 999 files in this program) files that are all 29 bytes long because they contain the boilerplate MIDI code but nothing else, so if the Arduino has been idling _without_ any MIDI event having been seen yet, we delete the currently open file first, so that when the Arduino restarts, it will create "the same file" and it'll be as if we've hit rewind on the current file, rather than having restarted.
+
+Also note that we're closing our file before we reset: as long as our file handle is open, the actual on-disk state is _unknown_ and it's entirely possible for our SD card to show a 0 byte file, so we want to explicitly close the file handle before we reset. This is also why you're seeing that `file.flush()`, which runs (without closing the file) if we're not resetting: we want to make sure that the on-disk file is kept reasonably in sync with the data we've been recording, keeping the SD controller's file buffer nice and small.
+
+Finally, there's the `reset_arduino()` "function". This doesn't look like any function you've seen, and is really not so much a normal function as an exploit of the Arduino chipset's watchdog: we're intentionally doing something illegal, which causes the Arduino to reset! There are a million ways to make C++ code do something illegal, but in this case we're defining a function pointer that tries to execute whatever's in memory address 0. That's _incredibly wrong_ and so when we execute that call, the Arduino goes "WHAT? NO!" and reboots. It's delightfully effective.
+
+## And we're done
+
+That's it, all that reminds is to assemble the circuits, and put all the code toghether, and you have yourself an Arduino MIDI recorder! Thanks for reading along, and if you put this together and put it to good use, shoot me a message! I love hearing from folks who put what I make to good use (or _bad_!) use =D
+
+## Comments and/or questions
 
 Hit up [the issue tracker](https://github.com/Pomax/arduino-midi-recorder/issues) if you want to have a detailed conversation, or just tweet/toot at me on [Twitter](https://twitter.com/TheRealPomax) or [Mastodon](https://mastodon.social/@TheRealPomax) if you want the kind of momentary engagement the internet seems to be for these days =)
 
