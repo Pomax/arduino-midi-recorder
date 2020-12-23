@@ -43,18 +43,148 @@ Also, we're going to add a little piezo speaker and a button that we can press t
 
 ## The Software
 
-In order to program the Arduino to do what we need it to do, we'll need `midi.h` and `SD.h` imported. To make everything happen our program consists of four parts:
+With the circuitry set up, let's start writing our program, focussing on dealing with each circuit in its own section
 
+1. program basics
 1. basic signal handling (MIDI library)
-2. basic file writing (SD library)
-3. Audio debugging (beep beep)
-4. restart on "no activity"
+1. basic file writing (SD library)
+1. Audio debugging (beep beep)
+1. Usability bonus: "clean restart" on idle
 
+### Program basics
 
+Our basic program will need to import the standard [SD](https://www.arduino.cc/en/reference/SD) library, as well as the [MIDI](https://github.com/FortySevenEffects/arduino_midi_library) library (which you'll probably need to [install first](https://github.com/FortySevenEffects/arduino_midi_library#getting-started)).
+
+```c++
+#include <SD.h>
+#include <MIDI.h>
+
+MIDI_CREATE_DEFAULT_INSTANCE();
+
+/**
+   Set up our MIDI field recorder
+*/
+void setup() {
+  // we'll put some more code here in the next sections
+}
+
+/**
+   The "game loop" consists of checking whether we need to
+   perform any file management, and then checking for MIDI input.
+*/
+void loop() {
+  // we'll put some more code here in the next sections
+}
+```
+
+And we're done!
+
+Of course this doesn't _do_ anything yet, so let's add the rest of the code, too.
 
 ### MIDI handling
 
-...
+For our MIDI handling, we'll need to set up listeners for MIDI events, and make sure to poll for that data during the program loop:
+
+```c++
+void setup() {
+  MIDI.begin(MIDI_CHANNEL_OMNI);
+  MIDI.setHandleNoteOn(handleNoteOn);
+  MIDI.setHandleNoteOff(handleNoteOff);
+  MIDI.setHandlePitchBend(handlePitchBend);
+  MIDI.setHandleControlChange(handleControlChange);
+}
+
+void loop() {
+  MIDI.read();
+}
+```
+
+This sets up MIDI listening on all MIDI channels (there are sixteen of them, and we don't want to guess which channels are active), and reads out the MIDI data from `RX<-0` - you may have noticed we don't explicitly set a baud rate: the MIDI spec only allows for 31,250 bits per second, so the Arduino MIDI library automatically makes sure to set the correct polling rate for us.
+
+That leaves implementing our MIDI event handling:
+
+```c++
+#define NOTE_ON_EVENT 0x90
+#define NOTE_OFF_EVENT 0x80
+#define CONTROL_CHANGE_EVENT 0x90
+#define PITCH_BEND_EVENT 0xE0
+
+void handleNoteOn(byte CHANNEL, byte pitch, byte velocity) {
+  byte event_type_on_channel = NOTE_ON_EVENT | CHANNEL;
+  write_to_file(event_type_on_channel, pitch, velocity);
+}
+
+void handleNoteOff(byte CHANNEL, byte pitch, byte velocity) {
+  byte event_type_on_channel = NOTE_OFF_EVENT | CHANNEL;
+  write_to_file(event_type_on_channel, pitch, velocity);
+}
+
+void handleControlChange(byte CHANNEL, byte controller_code, byte value) {
+  byte event_type_on_channel = CONTROL_CHANGE_EVENT | CHANNEL;
+  write_to_file(event_type_on_channel, controller_code, value);
+}
+
+void handlePitchBend(byte CHANNEL, int bend_value) {
+  byte event_type_on_channel = PITCH_BEND_EVENT | CHANNEL;
+  
+  // per the MIDI spec, bend_value is 14 bits, and needs
+  // to be encoded in two bytes as two 7-bit values, the
+  // first the lowest 7 bits, and the second the high 7 bits:
+  byte low_7_bits = (byte) (bend_value & 0x7F);
+  byte high_7_bits = (byte) ((bend_value >> 7) & 0x7F);
+
+  write_to_file(event_type_on_channel, low_7_bits, high_7_bits);
+}
+```
+
+This is a good start, but MIDI events are just that: events, and events happen "at some specific time" which we're still going to have to capture. MIDI events don't rely on absolute time based on some kind of real time clock (which is good for us, because Arduino doesn't have an RTC built in!) and instead relies on counting a "time delta": it marks events with the number of "MIDI clock ticks" since the previous event, with the very first event in the event stream having an explicit time delta of zero.
+
+So: let's write a `get_time_delta()` function that we can use to get the number of MIDI ticks since the last event (=since the last time `get_time_delta()` got called) so that we have all the data we need ready to start writing MIDI to file:
+
+```c++
+unsigned long start_time = 0;
+unsigned long last_time = 0;
+unsigned int time_delta = 0;
+
+int get_time_delta() {
+  if (start_time == 0) {
+    start_time = micros();
+    last_time = start_time;
+    return 0;
+  }
+  time_delta = (micros() - last_time) / 100;
+  last_time += time_delta ;
+  return delta;
+}
+```
+
+This function seems bigger than it has to be: we _could_ just start the clock when our sketch starts, setting `last_time=micros()` in `setup()`, and then in `get_time_delta` only have the `time_delta` calculation and `last_time` update, but that would be explicitly encoding "a lot of nothing" at the start of our MIDI file: we'd be counting the ticks for the first event relative to starting the program, rather than treating the first event as starting at tick zero. So instead, we explicitly encode the time that the first event happens as `start_time` and then we start delta calculation relative to that, instead.
+
+That just leaves updating our handlers:
+
+```c++
+void handleNoteOn(byte CHANNEL, byte pitch, byte velocity) {
+  ...
+  write_to_file(..., get_time_delta());
+}
+
+void handleNoteOff(byte CHANNEL, byte pitch, byte velocity) {
+  ...
+  write_to_file(..., get_time_delta());
+}
+
+void handleControlChange(byte CHANNEL, byte controller_code, byte value) {
+  ...
+  write_to_file(..., get_time_delta());
+}
+
+void handlePitchBend(byte CHANNEL, int bend_value) {
+  ...
+  write_to_file(..., get_time_delta());
+}
+```
+
+Which means we can move on to actually writing MIDI data to a `.mid` file!
 
 ### File management
 
@@ -68,3 +198,8 @@ In order to program the Arduino to do what we need it to do, we'll need `midi.h`
 
 ...
 
+# Comments and/or questions
+
+Hit up https://github.com/Pomax/arduino-midi-recorder/issues if you want to have a detailed conversation, or just tweet/toot at me on https://twitter.com/TheRealPomax or https://mastodon.social/@TheRealPomax if you want the kind of momentary engagement the internet seems to be for these days =)
+
+- Pomax
