@@ -8,18 +8,33 @@ There are many, _many_ ways to record audio, from microphones to line monitors t
 
 You'd think this would be something that already exists as a product you can just buy. Amazingly, it is not. So if you want one too, you'll have to build one, and if you want to build one, this post might be useful to you!
 
+## Table of contents
+
+1. [The circuitry](#the-circuitry)
+  1. [MIDI](#the-midi-part-of-our-recorder)
+  1. [SD card](#the-sd-part-of-our-recorder)
+  1. [All the beeps](#adding-a-beep-for-debugging)
+1. [The software](#the-software)
+  1. [Basics](#program-basics)
+  1. [MIDI handling](#midi-handling)
+  1. [File management](#file-management)
+  1. [Making some beeps](#making-some-beeps)
+  1. [idle handling](#autorestart)
+1. [Comments/questions](#comments-and-or-questions)
+
 ## The circuitry
 
 To build this, we're going to basically build a standard Arduino based MIDI pass-through, with an SD card circuit hooked up so we can save the data that comes flying by. To build everything, we'll need:
 
 1. An Arduino UNO R3 or equivalent board (anywhere between $10 and $25)
-2. An Arduino SD card module ($7 for a pack of five)
-3. Two female 5-pin DIN connectors ($5 for a pack of ten)
-4. A 6N138 optocoupler ($10 for a pack of ten)
-5. 3x 220 ohm resistors
-6. 1x 4.7k ohm resistor
-7. A diode
-8. A (4 pin) clicky pushy button
+1. An Arduino SD card module ($7 for a pack of five)
+1. Two female 5-pin DIN connectors ($5 for a pack of ten)
+1. A 6N138 optocoupler ($10 for a pack of ten)
+1. 3x 220 ohm resistors
+1. 1x 4.7k ohm resistor
+1. A diode
+1. A piezo buzzer
+1. A (4 pin) clicky pushy button
 
 ### The MIDI part of our recorder
 
@@ -38,8 +53,6 @@ The SD card circuitry is literally just a matter of "connect the pins to the pin
 Also, we're going to add a little piezo speaker and a button that we can press to turn on (or off) playing a note corresponding to a MIDI note getting played, mostly as the audio equivalent of visual debugging. There's barely any work here: we hook up the "speaker" between pin 8 and ground, and the button to pin 2. Beep, beep!
 
 <img alt="beep beep button diagram" src="./button.png" width="50%">
-
-
 
 ## The Software
 
