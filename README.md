@@ -24,17 +24,20 @@ You'd think this would be something that already exists as a product you can jus
 
 ## The circuitry
 
-To build this, we're going to basically build a standard Arduino based MIDI pass-through, with an SD card circuit hooked up so we can save the data that comes flying by. To build everything, we'll need:
+To build this, we're going to basically build a standard Arduino based MIDI pass-through, with an SD card circuit hooked up so we can save the data that comes flying by. To build everything, we'll need some special components:
 
-1. An Arduino UNO R3 or equivalent board (anywhere between $10 and $25)
-1. An Arduino SD card module ($7 for a pack of five)
-1. Two female 5-pin DIN connectors ($5 for a pack of ten)
-1. A 6N138 optocoupler ($10 for a pack of ten)
+1. An Arduino SD card module (~$10 for a pack of five)
+1. Two female 5-pin DIN connectors (~$5 for a pack of ten)
+1. A 6N138 optocoupler (~$10 for a pack of ten)
+
+And of course, the bits that you'll get with pretty much any Arduino starter kit:
+
+1. An Arduino UNO R3 or equivalent board
 1. 3x 220 ohm resistors
 1. 1x 4.7k ohm resistor
 1. A diode
 1. A piezo buzzer
-1. A (4 pin) clicky pushy button
+1. A clicky pushy button
 
 ### The MIDI part of our recorder
 
