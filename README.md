@@ -163,7 +163,9 @@ int get_time_delta() {
 
 This function seems bigger than it has to be: we _could_ just start the clock when our sketch starts, setting `last_time=micros()` in `setup()`, and then in `get_time_delta` only have the `time_delta` calculation and `last_time` update, but that would be explicitly encoding "a lot of nothing" at the start of our MIDI file: we'd be counting the ticks for the first event relative to starting the program, rather than treating the first event as starting at tick zero. So instead, we explicitly encode the time that the first event happens as `start_time` and then we start delta calculation relative to that, instead.
 
-That just leaves updating our handlers:
+You may also have noticed that we're (a) using `micros()` instead of the more common `millis()`, and (b) we're not even using that value directly, we're scaling it so that our ticks are 1/10,000th of a second instead. The reason here is that the MIDI spec links "the number of ticks per quaver/quarter note" and "the time it takes to play a quaver/quarter note" based on microseconds: in our case, we'll be defining a quaver/quarter note as taking 390,000μs, spanning an interval of 4000 ticks. So, in order to make sure there's we're using the correct scale for the number of ticks, we'll need to divide `micros()` by 100.
+
+That then just leaves updating our handlers:
 
 ```c++
 void handleNoteOn(byte CHANNEL, byte pitch, byte velocity) {
