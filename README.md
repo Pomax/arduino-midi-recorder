@@ -11,15 +11,15 @@ You'd think this would be something that already exists as a product you can jus
 ## Table of contents
 
 1. [The circuitry](#the-circuitry)
-  1. [MIDI](#the-midi-part-of-our-recorder)
-  1. [SD card](#the-sd-part-of-our-recorder)
-  1. [All the beeps](#adding-a-beep-for-debugging)
+   1. [MIDI](#the-midi-part-of-our-recorder)
+   1. [SD card](#the-sd-part-of-our-recorder)
+   1. [All the beeps](#adding-a-beep-for-debugging)
 1. [The software](#the-software)
-  1. [Basics](#program-basics)
-  1. [MIDI handling](#midi-handling)
-  1. [File management](#file-management)
-  1. [Making some beeps](#making-some-beeps)
-  1. [idle handling](#autorestart)
+   1. [Basics](#program-basics)
+   1. [MIDI handling](#midi-handling)
+   1. [File management](#file-management)
+   1. [Making some beeps](#making-some-beeps)
+   1. [idle handling](#autorestart)
 1. [Comments/questions](#comments-and-or-questions)
 
 ## The circuitry
