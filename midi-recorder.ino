@@ -212,9 +212,10 @@ void handleControlChange(byte channel, byte cc, byte value) {
   writeToFile(CONTROL_CHANGE_EVENT, cc, value, getDelta());
 }
 
-void handlePitchBend(byte channel, int bend) {
-  byte lsb = (byte) (bend & 0x7F);
-  byte msb = (byte) ((bend >> 7) & 0x7F);
+void handlePitchBend(byte channel, int bend) {  
+  bend += 0x2000; // MIDI bend is 0x0000-0x3FFF with 0x2000 as center.
+  byte lsb = bend & 0x7F;
+  byte msb = bend >> 7;
   writeToFile(PITCH_BEND_EVENT, lsb, msb, getDelta());
 }
 
