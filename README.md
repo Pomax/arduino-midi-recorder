@@ -21,7 +21,8 @@ You'd think this would be something that already exists as a product you can jus
    1. [File management](#file-management)
    1. [Making some beeps](#making-some-beeps)
    1. [idle handling](#creating-a-new-file-when-idling)
-1. [A final helper script](#a-final-helper-script)
+   1. [A final helper script](#a-final-helper-script)
+1. [Importing into your DAW](#importing-into-your-daw)
 1. [Comments/questions](#comments-and-or-questions)
 
 
@@ -74,11 +75,12 @@ Also, we're going to add a little piezo speaker and a button that we can press t
 
 With the circuitry set up, let's start writing our program, focussing on dealing with each circuit in its own section
 
-1. program basics
-1. basic signal handling (MIDI library)
-1. basic file writing (SD library)
-1. Audio debugging (beep beep)
-1. Usability bonus: "clean restart" on idle
+1. [Basprogram basicsics](#program-basics)
+1. [basic signal handling (MIDI library)](#midi-handling)
+1. [basic file writing (SD library)](#file-management)
+1. [Audio debugging (beep beep)](#making-some-beeps)
+1. [Usability bonus: "clean restart" on idle](#creating-a-new-file-when-idling)
+1. [Usability bonus 2: "fix the track length" script](#a-final-helper-script)
 
 
 ### Program basics
@@ -435,7 +437,7 @@ Also note that we're closing our file before we reset: as long as our file handl
 Finally, there's the `resetArduino()` "function". This doesn't look like any function you've seen, and is really not so much a normal function as an exploit of the Arduino chipset's watchdog: we're intentionally doing something illegal, which causes the Arduino to reset! There are a million ways to make C++ code do something illegal, but in this case we're defining a function pointer that tries to execute whatever's in memory address 0. That's _incredibly wrong_ and so when we execute that call, the Arduino goes "WHAT? NO!" and reboots. It's delightfully effective.
 
 
-## A final helper script
+### A final helper script
 
 One last thing we'll want to do is not actually related to circuits or Arduino programming, but has to do with fixing a loose end: our track length.
 
@@ -480,9 +482,44 @@ Now, every time we want to load our `.mid` files from SD card into a DAW or othe
 (You can also directly download this script [here](https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/fix.py))
 
 
-## And that's it: we're done!
+### And that's it: we're done!
 
 That's it, all that reminds is to assemble the circuits, and put all the code toghether, and you have yourself an Arduino MIDI recorder! Thanks for reading along, and if you put this together and put it to good use, shoot me a message! I love hearing from folks who put what I make to good use (or _bad_!) use =D
+
+
+## Importing into your DAW
+
+Now that you've got something that create `.mid` files, you'll probably want to import those `.mid` files into your DAW: depending on your choice in DAW that may or may not be straightforward, so here are the various ways in which do achieve an import in some common DAWs, and if you use a different DAW but know how to import a `.mid` including its automation, let me know and we can add it to the list!
+
+### Ableton Live 10
+
+Super Easy: go to the `Arrangement View` and just drag the `.mid` file onto a MIDI track. Congratulations, you are done =)
+
+(to _see_ the  automation, turn on the `Envelope Box` in the channel strip: click the "linked dots" icon to the right of the music note icon at the bottom of the `clip` channel strip module, then pick the control you want to see the automation for in the `Envelopes` channel strip module to the right)
+
+
+### Image-Line's FL Studio 20
+
+Note data: super easy.
+Automation: super complicated.
+
+Drop your `.mid` file onto a pattern's `Piano roll`. This will prompt you on what to import, import everything, and you'll have imported the note data.
+
+That covers the easy part, on to the complicated part:
+
+To import the automation, things get considerably more annoying than they are in Ableton: [The official documentation is here](https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/automation_midiimport.htm) but that can only import CC data, so if you're also using Pitch Bend, you're out of luck, because Pitch Bend is not a CC message, but its own code (on the same footing as note on/off and CC).
+
+A better solution is described by user NTO [on the FL Studio forum](https://forum.image-line.com/viewtopic.php?f=100&t=163314&hilit=TypeCnvrt&p=1163949#p1163949) but even so, it's much harder than it should be and if you're an FL Studio user you should probably file a feature request. The more of us do, the more they'll know it's something folks care about and the more likely it is they can justify spending time on fixing MIDI importing =)
+
+
+### Presonus' Studio One 5
+
+Super Easy: drag the `.mid` file onto a track. Congratulations, you are done =)
+
+
+### Reaper 6
+
+Super Easy: drag the `.mid` file onto a track. Congratulations, you are done =)
 
 
 ## Comments and/or questions
