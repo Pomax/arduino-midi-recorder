@@ -186,7 +186,7 @@ int getTmeDelta() {
   }
   timeDelta = (micros() - lastTime) / 100;
   lastTime += timeDelta ;
-  return delta;
+  return timeDelta;
 }
 ```
 
@@ -356,10 +356,10 @@ void loop() {
 }
 
 void setPlayState() {
-  int sig = digitalRead(AUDIO_DEBUG_PIN);
-  if (sig != lastPlayState) {
-    lastPlayState = sig;
-    if (sig == 1) play = !play;
+  int signal = digitalRead(AUDIO_DEBUG_PIN);
+  if (signal != lastPlayState) {
+    lastPlayState = signal;
+    if (signal == 1) play = !play;
   }
 }
 ```
@@ -399,7 +399,7 @@ Finally, the whole point of this recorder is to record MIDI... not to record an 
 As it so happens, the first part is _constantly_ true, because we're only writing to our file when new data comes in, and we've _also_ already implemented the second part: that happens automatically when you turn on the Arduino, so the only thing we're missing is a way to detect whether there's not been any input for a while:
 
 ```c++
-#define RECORDING_TIMEOUT = 120000000
+#define RECORDING_TIMEOUT 120000000
 // 2 minutes, counted in microseconds
 
 unsigned long lastLoopCounter = 0;

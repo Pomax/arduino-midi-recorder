@@ -5,19 +5,19 @@
    and a MIDI-IN device (like a computer) for saving all
    note, pitch, and CC data that's being played without
    having any device specifically set to "record".
-   
+
    This is Public Domain code, with all the caveats that
    comes with for you, because public domain is not the
    same as open source.
-   
+
    See https://opensource.org/node/878 for more details.
-   
+
    The reason this code is in the public domain is
-   because anyone with half a brain and a need to 
+   because anyone with half a brain and a need to
    create this functionality will reasonably end up
    with code that's so similar as to effectively be
    the same as what has been written here.
-   
+
    Having said that, there are countries that do not
    recognize the Public Domain. In those countries,
    this code is to be considered as being provided
@@ -33,18 +33,26 @@
 #define CHIP_SELECT 9
 #define HAS_MORE_BYTES 0x80
 
-int last_play_state = 0;
-bool play;
+#define NOTE_OFF_EVENT 0x80
+#define NOTE_ON_EVENT 0x90
+#define CONTROL_CHANGE_EVENT 0xB0
+#define PITCH_BEND_EVENT 0xE0
+
+#define RECORDING_TIMEOUT 120000000
+// 2 minutes, counted in microseconds
+
+int lastPlayState = 0;
+boolean play = false;
 String filename;
 File file;
 
 unsigned long startTime = 0;
 unsigned long lastTime = 0;
+unsigned int timeDelta = 0;
 
 unsigned long lastLoopCounter = 0;
 unsigned long loopCounter = 0;
 
-unsigned long RECORDING_TIMEOUT = 120000000; // 2 minutes, counted in microseconds
 
 MIDI_CREATE_DEFAULT_INSTANCE();
 
@@ -65,7 +73,6 @@ void setup() {
 
   // set up the tone playing button
   pinMode(AUDIO_DEBUG_PIN, INPUT);
-  play = false;
 
   // set up SD card functionality
   pinMode(CHIP_SELECT, OUTPUT);
@@ -84,7 +91,7 @@ void setup() {
     }
 
     if (filename) {
-      openFile();
+      file = SD.open(filename, FILE_WRITE);
 
       byte header[] = {
         0x4D, 0x54, 0x68, 0x64,   // "MThd" chunk
@@ -124,29 +131,6 @@ void loop() {
 
 // ======================================================================================
 
-/**
-   Standard file open, in O_READ|O_CREATE|O_WRITE|O_APPEND mode
-*/
-void openFile() {
-  if (file) file.close();
-  file = SD.open(filename, FILE_WRITE);
-}
-
-/**
-  if we've not received any data for 2 minutes,
-  delete the current file if it's empty, and reset
-  the arduino, so that we're on a new file.
-*/
-void checkReset() {
-  if (!file) return;
-  if (micros() - lastTime > RECORDING_TIMEOUT) {
-    if (startTime == 0) {
-      file.close();
-      SD.remove(filename);
-    }
-    resetArduino();
-  }
-}
 
 /**
    We close-and-reopen our file every 400ms, allowing
@@ -162,7 +146,23 @@ void cycleFile() {
   if (loopCounter - lastLoopCounter > 400) {
     checkReset();
     lastLoopCounter = loopCounter;
-    openFile();
+    file.flush();
+  }
+}
+
+/**
+  if we've not received any data for 2 minutes,
+  delete the current file if it's empty, and reset
+  the arduino, so that we're on a new file.
+*/
+void checkReset() {
+  if (!file) return;
+  if (micros() - lastTime > RECORDING_TIMEOUT) {
+    file.close();
+    if (startTime == 0) {
+      SD.remove(filename);
+    }
+    resetArduino();
   }
 }
 
@@ -173,10 +173,10 @@ void cycleFile() {
    event that comes flying by.
 */
 void setPlayState() {
-  int sig = digitalRead(AUDIO_DEBUG_PIN);
-  if (sig != last_play_state) {
-    last_play_state = sig;
-    if (sig == 1) play = !play;
+  int signal = digitalRead(AUDIO_DEBUG_PIN);
+  if (signal != lastPlayState) {
+    lastPlayState = signal;
+    if (signal == 1) play = !play;
   }
 }
 
@@ -184,39 +184,38 @@ void setPlayState() {
 // ======================================================================================
 
 
-void handleNoteOn(byte channel, byte pitch, byte velocity) {
-  writeToFile(0x90, pitch, velocity, getDelta());
+void handleNoteOn(byte CHANNEL, byte pitch, byte velocity) {
+  writeToFile(NOTE_ON_EVENT | CHANNEL, pitch, velocity, getTimeDelta());
   // Only useful for audio based debugging:
   if (play) tone(AUDIO, 440 * pow(2, (pitch - 69.0) / 12.0), 100);
 }
 
-void handleNoteOff(byte channel, byte pitch, byte velocity) {
-  writeToFile(0x80, pitch, velocity, getDelta());
+void handleNoteOff(byte CHANNEL, byte pitch, byte velocity) {
+  writeToFile(NOTE_OFF_EVENT | CHANNEL, pitch, velocity, getTimeDelta());
 }
 
-void handlePitchBend(byte channel, int bend) {
-  byte lsb = (byte) (bend & 0x7F);
-  byte msb = (byte) ((bend >> 7) & 0x7F);
-  writeToFile(0xE0, lsb, msb, getDelta());
+void handleControlChange(byte CHANNEL, byte controller_code, byte value) {
+  writeToFile(CONTROL_CHANGE_EVENT | CHANNEL, controller_code, value, getTimeDelta());
 }
 
-void handleControlChange(byte channel, byte cc, byte value) {
-  writeToFile(0xB0, cc, value, getDelta());
+void handlePitchBend(byte CHANNEL, int bend_value) {
+  byte low_7_bits = (byte) (bend_value & 0x7F);
+  byte high_7_bits = (byte) ((bend_value >> 7) & 0x7F);
+  writeToFile(PITCH_BEND_EVENT | CHANNEL, low_7_bits, high_7_bits, getTimeDelta());
 }
 
 /**
    This calculates the number of ticks since the last MIDI event
 */
-int getDelta() {
+int getTimeDelta() {
   if (startTime == 0) {
     startTime = micros();
     lastTime = startTime;
     return 0;
   }
-  unsigned long now = micros();
-  unsigned int v = (now - lastTime) / 100;
-  lastTime = now;
-  return v;
+  timeDelta = (micros() - lastTime) / 100;
+  lastTime += timeDelta ;
+  return timeDelta;
 }
 
 /**
@@ -229,7 +228,7 @@ int getDelta() {
 */
 void writeToFile(byte eventType, byte b1, byte b2, int delta) {
   if (!file) return;
-  writeVarLen(file, delta);
+  writeVarLen(delta);
   file.write(eventType);
   file.write(b1);
   file.write(b2);
@@ -238,17 +237,15 @@ void writeToFile(byte eventType, byte b1, byte b2, int delta) {
 /**
    Ported from the MIDI spec:
 */
-void writeVarLen(File file, unsigned long value) {
+void writeVarLen(unsigned long value) {
   unsigned long buffer = value & 0x7f;
 
-  // esnure MSBF ordering
   while ((value >>= 7) > 0) {
     buffer <<= 8;
     buffer |= HAS_MORE_BYTES;
     buffer |= value & 0x7f;
   }
 
-  // write out values (LIFO)
   while (true) {
     file.write((byte)(buffer & 0xff));
     if (buffer & HAS_MORE_BYTES) {
@@ -262,10 +259,10 @@ void writeVarLen(File file, unsigned long value) {
 /*********************************************************
    If you live in a country that does not recognise the
    Public Domain, the following (MIT) license applies:
-   
+
      Copyright 2020, Pomax
      Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
      The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.   
+     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
  ********************************************************/
