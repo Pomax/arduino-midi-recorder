@@ -38,7 +38,7 @@ You'd think this would be something that already exists as a product you can jus
 
 ## The circuitry
 
-<img src="banner.jpg" height="300">
+<a href="banner.jpg" target="_blank"><img src="banner.jpg" height="300"></a>
 
 To build this, we're going to basically build a standard Arduino based MIDI pass-through, with an SD card circuit hooked up so we can save the data that comes flying by. To build everything, we'll need some special components:
 
