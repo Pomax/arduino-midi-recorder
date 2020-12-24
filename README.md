@@ -150,10 +150,16 @@ void handleControlChange(byte channel, byte controller, byte value) {
 }
 
 void handlePitchBend(byte channel, int bend_value) {
-  // Per the MIDI spec, bend_value is 14 bits, and needs
-  // to be encoded as two 7-bit bytes, encoded as the
-  // lowest 7 bits in the first byte, and the highest 7
-  // bits in the second byte:
+  // First off, we need to "recenter" the bend value,
+  // because in MIDI, the bend value is a positive value
+  // in the range 0x0000-0x3FFF with 0x2000 considered
+  // the "neutral" mid point:
+  bend_value += 0x2000;
+  
+  // Then, per the MIDI spec, bend_value is 14 bits, and
+  // needs to be encoded as two 7-bit bytes, encoded as
+  // the lowest 7 bits in the first byte, and the highest
+  // 7 bits in the second byte:
   byte lowBits = (byte) (bend_value & 0x7F);
   byte highBits = (byte) ((bend_value >> 7) & 0x7F);
 
