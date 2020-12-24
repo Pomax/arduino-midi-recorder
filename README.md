@@ -403,7 +403,7 @@ To keep things simple, because we're only writing this code for some debugging (
 
 ```
 
-So now if we start our program, and we press our button, playing notes on our MIDI device will make the Arduino beep along with what we're playing. Of course, the `tone()` function can only play a single note at a time, so it's going to sound wonky if we play chords, but it'll beeping as best as it can.
+So now if we start our program, and we press our button, playing notes on our MIDI device will make the Arduino beep along with what we're playing. Of course, the `tone()` function can only play a single note at a time, so it's going to sound wonky if we play chords, but it'll be beeping as best as it can.
 
 Beep, beep!
 
