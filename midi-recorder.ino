@@ -42,24 +42,18 @@
 // 2 minutes, counted in microseconds
 
 int lastPlayState = 0;
-boolean play = false;
+bool play;
+
 String filename;
 File file;
 
 unsigned long startTime = 0;
 unsigned long lastTime = 0;
-unsigned int timeDelta = 0;
 
 unsigned long lastLoopCounter = 0;
 unsigned long loopCounter = 0;
 
-
 MIDI_CREATE_DEFAULT_INSTANCE();
-
-/**
-   This will reboot the arduino when called
-*/
-void(* resetArduino) (void) = 0;
 
 /**
    Set up our MIDI field recorder
@@ -73,57 +67,72 @@ void setup() {
 
   // set up the tone playing button
   pinMode(AUDIO_DEBUG_PIN, INPUT);
+  play = false;
 
   // set up SD card functionality
   pinMode(CHIP_SELECT, OUTPUT);
 
   if (SD.begin(CHIP_SELECT)) {
-    // We could use the EEPROM to store this number,
-    // but since we're not going to get timestamped
-    // files anyway, just looping is also fine.
-    for (int i = 1; i < 9999; i++) {
-      filename = "file-";
-      if (i < 10) filename += "0";
-      if (i < 100) filename += "0";
-      filename += String(i);
-      filename += String(".mid");
-      if (!SD.exists(filename)) break;
-    }
-
-    if (filename) {
-      file = SD.open(filename, FILE_WRITE);
-
-      byte header[] = {
-        0x4D, 0x54, 0x68, 0x64,   // "MThd" chunk
-        0x00, 0x00, 0x00, 0x06,   // chunk length (from this point on)
-        0x00, 0x00,               // format 0
-        0x00, 0x01,               // one track
-        0x0F, 0xA0                // data rate = 4000 ticks per quarter note
-      };
-      file.write(header, 14);
-
-      byte track[] = {
-        0x4D, 0x54, 0x72, 0x6B,   // "MTrk" chunk
-        0x00, 0x00, 0x00, 0x00    // chunk length placeholder (MSB)
-      };
-      file.write(track, 8);
-
-      byte tempo[] = {
-        0x00,                     // time delta (of zero)
-        0xFF, 0x51, 0x03,         // tempo op code
-        0x05, 0xF3, 0x70          // real rate = 390,000μs per quarter note
-      };
-      file.write(tempo, 7);
+    findNextFilename();
+    if (file) {
+      createMidiFile();
     }
   }
 }
 
 /**
-   The "game loop" consists of checking whether we need to
-   perform any file management, and then checking for MIDI input.
+    We could use the EEPROM to store this number,
+    but since we're not going to get timestamped
+    files anyway, just looping is also fine.
+*/
+void findNextFilename() {
+  for (int i = 1; i < 1000; i++) {
+    filename = "file-";
+    if (i < 10) filename += "0";
+    if (i < 100) filename += "0";
+    filename += String(i);
+    filename += String(".mid");
+
+    if (!SD.exists(filename)) {
+      file = SD.open(filename, FILE_WRITE);
+      return;
+    }
+  }
+}
+
+/**
+   Set up a new MIDI file with some boilter plate byte code
+*/
+void createMidiFile() {
+  byte header[] = {
+    0x4D, 0x54, 0x68, 0x64,   // "MThd" chunk
+    0x00, 0x00, 0x00, 0x06,   // chunk length (from this point on)
+    0x00, 0x00,               // format 0
+    0x00, 0x01,               // one track
+    0x11, 0x94                // data rate = 4500 ticks per quarter note
+  };
+  file.write(header, 14);
+
+  byte track[] = {
+    0x4D, 0x54, 0x72, 0x6B,   // "MTrk" chunk
+    0x00, 0x00, 0x00, 0x00    // chunk length placeholder (MSB)
+  };
+  file.write(track, 8);
+
+  byte tempo[] = {
+    0x00,                     // time delta (of zero)
+    0xFF, 0x51, 0x03,         // tempo op code
+    0x06, 0xDD, 0xD0          // real rate = 450,000μs per quarter note (= 132 BPM)
+  };
+  file.write(tempo, 7);
+}
+
+/**
+   The program loop consists of checking whether we need to perform
+   any file management, and then checking for MIDI input.
 */
 void loop() {
-  cycleFile();
+  updateFile();
   setPlayState();
   MIDI.read();
 }
@@ -141,7 +150,7 @@ void loop() {
    for every single write operation (which would be
    rather terrible, performance wise).
 */
-void cycleFile() {
+void updateFile() {
   loopCounter = millis();
   if (loopCounter - lastLoopCounter > 400) {
     checkReset();
@@ -151,6 +160,12 @@ void cycleFile() {
 }
 
 /**
+   This will crash the arduino when called as a function,
+   so the watchdog will catch that and restart, instead =)
+*/
+void(* resetArduino) (void) = 0;
+
+/**
   if we've not received any data for 2 minutes,
   delete the current file if it's empty, and reset
   the arduino, so that we're on a new file.
@@ -158,8 +173,8 @@ void cycleFile() {
 void checkReset() {
   if (!file) return;
   if (micros() - lastTime > RECORDING_TIMEOUT) {
-    file.close();
     if (startTime == 0) {
+      file.close();
       SD.remove(filename);
     }
     resetArduino();
@@ -173,10 +188,10 @@ void checkReset() {
    event that comes flying by.
 */
 void setPlayState() {
-  int signal = digitalRead(AUDIO_DEBUG_PIN);
-  if (signal != lastPlayState) {
-    lastPlayState = signal;
-    if (signal == 1) play = !play;
+  int sig = digitalRead(AUDIO_DEBUG_PIN);
+  if (sig != lastPlayState) {
+    lastPlayState = sig;
+    if (sig == 1) play = !play;
   }
 }
 
@@ -184,38 +199,38 @@ void setPlayState() {
 // ======================================================================================
 
 
+void handleNoteOff(byte CHANNEL, byte pitch, byte velocity) {
+  writeToFile(NOTE_OFF_EVENT | CHANNEL, pitch, velocity, getDelta());
+}
+
 void handleNoteOn(byte CHANNEL, byte pitch, byte velocity) {
-  writeToFile(NOTE_ON_EVENT | CHANNEL, pitch, velocity, getTimeDelta());
-  // Only useful for audio based debugging:
+  writeToFile(NOTE_ON_EVENT | CHANNEL, pitch, velocity, getDelta());
   if (play) tone(AUDIO, 440 * pow(2, (pitch - 69.0) / 12.0), 100);
 }
 
-void handleNoteOff(byte CHANNEL, byte pitch, byte velocity) {
-  writeToFile(NOTE_OFF_EVENT | CHANNEL, pitch, velocity, getTimeDelta());
+void handleControlChange(byte CHANNEL, byte cc, byte value) {
+  writeToFile(CONTROL_CHANGE_EVENT | CHANNEL, cc, value, getDelta());
 }
 
-void handleControlChange(byte CHANNEL, byte controller_code, byte value) {
-  writeToFile(CONTROL_CHANGE_EVENT | CHANNEL, controller_code, value, getTimeDelta());
-}
-
-void handlePitchBend(byte CHANNEL, int bend_value) {
-  byte low_7_bits = (byte) (bend_value & 0x7F);
-  byte high_7_bits = (byte) ((bend_value >> 7) & 0x7F);
-  writeToFile(PITCH_BEND_EVENT | CHANNEL, low_7_bits, high_7_bits, getTimeDelta());
+void handlePitchBend(byte CHANNEL, int bend) {
+  byte lsb = (byte) (bend & 0x7F);
+  byte msb = (byte) ((bend >> 7) & 0x7F);
+  writeToFile(PITCH_BEND_EVENT | CHANNEL, lsb, msb, getDelta());
 }
 
 /**
    This calculates the number of ticks since the last MIDI event
 */
-int getTimeDelta() {
+int getDelta() {
   if (startTime == 0) {
     startTime = micros();
     lastTime = startTime;
     return 0;
   }
-  timeDelta = (micros() - lastTime) / 100;
-  lastTime += timeDelta ;
-  return timeDelta;
+  unsigned long now = micros();
+  unsigned int delta = (now - lastTime) / 100;
+  lastTime = now;
+  return delta;
 }
 
 /**
@@ -228,7 +243,7 @@ int getTimeDelta() {
 */
 void writeToFile(byte eventType, byte b1, byte b2, int delta) {
   if (!file) return;
-  writeVarLen(delta);
+  writeVarLen(file, delta);
   file.write(eventType);
   file.write(b1);
   file.write(b2);
@@ -237,15 +252,17 @@ void writeToFile(byte eventType, byte b1, byte b2, int delta) {
 /**
    Ported from the MIDI spec:
 */
-void writeVarLen(unsigned long value) {
+void writeVarLen(File file, unsigned long value) {
   unsigned long buffer = value & 0x7f;
 
+  // esnure MSBF ordering
   while ((value >>= 7) > 0) {
     buffer <<= 8;
     buffer |= HAS_MORE_BYTES;
     buffer |= value & 0x7f;
   }
 
+  // write out values (LIFO)
   while (true) {
     file.write((byte)(buffer & 0xff));
     if (buffer & HAS_MORE_BYTES) {
