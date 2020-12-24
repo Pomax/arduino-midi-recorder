@@ -468,19 +468,19 @@ for filename in midi_files:
     file_size = os.path.getsize(filename)
     track_length = file_size - 22
 
-    # With that done, we can read in the file as a byte array:
-    data = bytearray(file.read())
+    # With that done, we can form our new byte values:
+    field_value = bytearray([
+        (track_length & 0xFF000000) >> 24,
+        (track_length & 0x00FF0000) >> 16,
+        (track_length & 0x0000FF00) >> 8,
+        (track_length & 0x000000FF),
+    ])
 
-    # And update the track length bytes to the correct value:
-    data[18] = (track_length & 0xFF000000) >> 24
-    data[19] = (track_length & 0x00FF0000) >> 16
-    data[20] = (track_length & 0x0000FF00) >> 8
-    data[21] = (track_length & 0x000000FF)
-
-    # Then we write the update file back to disk:
-    file.seek(0)
-    file.write(data)
-    print(f"Updated {filename} track length to {track_length} bytes")
+    # And then we write the update to our file:
+    file.seek(18)
+    file.write(file_value)
+    file.close()
+    print(f"Updated {filename} track length to {track_length}")
 ```
 
 Now, every time we want to load our `.mid` files from SD card into a DAW or other MIDI-compatible program, we can just run this file first, and irrespective of whether our `.mid` files had valid track length values or not, they will be guaranteed to have correct values once the script finishes.
