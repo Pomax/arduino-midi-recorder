@@ -1,21 +1,5 @@
 # Creating a MIDI pass-through recorder
 
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Building an Arduino MIDI recorder">
-<meta name="twitter:description" content="Let's build an Arduino-based MIDI recorder, for fun and non-profit!">
-<meta name="twitter:image" content="https://pomax.github.io/arduino-midi-recorder/banner.jpg">
-
-<meta property="og:title" content="Building an Arduino MIDI recorder">
-<meta property="og:description" content="Let's build an Arduino-based MIDI recorder, for fun and non-profit!">
-<meta property="og:image" content="https://pomax.github.io/arduino-midi-recorder/banner.jpg">
-<meta property="og:site_name" content="pomax.github.io">
-<meta property="og:url" content="https://pomax.github.io/arduino-midi-controller">
-
-<meta itemprop="url" content="https://pomax.github.io/arduino-midi-controller">
-<meta itemprop="name" content="pomax.github.io">
-<meta itemprop="description" content="Let's build an Arduino-based MIDI recorder, for fun and non-profit!">
-<meta itemprop="image" content="https://pomax.github.io/arduino-midi-recorder/banner.jpg">
-
 If you've ever used audio softare on the computer, you probably know that MIDI exists: a signalling protocol that allows controllers to control vitual instruments like synths. It's also the protocol used by real audio hardware to talk to each, and you can think of it as the language in which devices talk about what they're doing, rather than what audio they're generating.
 
 As such, there are two ways to record instruments (real or virtual): record the sound they're making, or record the MIDI event that cause that sound to be made, and that's where things get interesting.
@@ -146,29 +130,24 @@ This sets up MIDI listening on all MIDI channels (there are sixteen of them, and
 That leaves implementing our MIDI event handling:
 
 ```c++
-#define NOTE_OFF_EVENT 0x80
-#define NOTE_ON_EVENT 0x90
+#define NOTE_OFF_EVENT 0x8C
+#define NOTE_ON_EVENT 0x9C
 #define CONTROL_CHANGE_EVENT 0xB0
 #define PITCH_BEND_EVENT 0xE0
 
-void handleNoteOff(byte CHANNEL, byte pitch, byte velocity) {
-  byte eventTypeOnChannel = NOTE_OFF_EVENT | CHANNEL;
-  writeToFile(eventTypeOnChannel, pitch, velocity);
+void handleNoteOff(byte channel, byte pitch, byte velocity) {
+  writeToFile(NOTE_OFF_EVENT, pitch, velocity);
 }
 
-void handleNoteOn(byte CHANNEL, byte pitch, byte velocity) {
-  byte eventTypeOnChannel = NOTE_ON_EVENT | CHANNEL;
-  writeToFile(eventTypeOnChannel, pitch, velocity);
+void handleNoteOn(byte channel, byte pitch, byte velocity) {
+  writeToFile(NOTE_ON_EVENT, pitch, velocity);
 }
 
-void handleControlChange(byte CHANNEL, byte controller, byte value) {
-  byte eventTypeOnChannel = CONTROL_CHANGE_EVENT | CHANNEL;
-  writeToFile(eventTypeOnChannel, controller, value);
+void handleControlChange(byte channel, byte controller, byte value) {
+  writeToFile(CONTROL_CHANGE_EVENT, controller, value);
 }
 
-void handlePitchBend(byte CHANNEL, int bend_value) {
-  byte eventTypeOnChannel = PITCH_BEND_EVENT | CHANNEL;
-
+void handlePitchBend(byte channel, int bend_value) {
   // Per the MIDI spec, bend_value is 14 bits, and needs
   // to be encoded as two 7-bit bytes, encoded as the
   // lowest 7 bits in the first byte, and the highest 7
@@ -176,9 +155,10 @@ void handlePitchBend(byte CHANNEL, int bend_value) {
   byte lowBits = (byte) (bend_value & 0x7F);
   byte highBits = (byte) ((bend_value >> 7) & 0x7F);
 
-  writeToFile(eventTypeOnChannel, lowBits, highBits);
+  writeToFile(PITCH_BEND_EVENT, lowBits, highBits);
 }
 ```
+(note that we're ignoring the `channel` byte: we'll be creating a "simple" format 0 MIDI file, which requires that all automation data goes on channel 1 (which has hax nibble `0`) and all note data goes on channel 13 (which has hex nibble `C`))
 
 This is a good start, but MIDI events are just that: events, and events happen "at some specific time" which we're still going to have to capture. MIDI events don't rely on absolute time based on some kind of real time clock (which is good for us, because Arduino doesn't have an RTC built in!) and instead relies on counting a "time delta": it marks events with the number of "MIDI clock ticks" since the previous event, with the very first event in the event stream having an explicit time delta of zero.
 
@@ -190,40 +170,38 @@ unsigned long lastTime = 0;
 
 int getDelta() {
   if (startTime == 0) {
-    startTime = micros();
+    startTime = millis();
     lastTime = startTime;
     return 0;
   }
-  unsigned long now = micros();
-  unsigned int delta = (now - lastTime) / 100;
+  unsigned long now = millis();
+  unsigned int delta = (now - lastTime);
   lastTime = now;
   return delta;
 }
 ```
 
-This function seems bigger than it has to be: we _could_ just start the clock when our sketch starts, setting `lastTime=micros()` in `setup()`, and then in `getDelta` only have the `timeDelta` calculation and `lastTime` update, but that would be explicitly encoding "a lot of nothing" at the start of our MIDI file: we'd be counting the ticks for the first event relative to starting the program, rather than treating the first event as starting at tick zero. So instead, we explicitly encode the time that the first event happens as `startTime` and then we start delta calculation relative to that, instead.
-
-You may also have noticed that we're (a) using `micros()` instead of the more common `millis()`, and (b) we're not even using that value directly, we're scaling it so that our ticks are 1/10,000th of a second instead. The reason here is that the MIDI spec links "the number of ticks per quaver/quarter note" and "the time it takes to play a quaver/quarter note" based on microseconds: in our case, we'll be defining a quaver/quarter note as taking 450,000μs (or roughly 133 beats per minute), with an interval of 4500 ticks per quaver/quarter note. So, in order to make sure there's we're using the correct scale for the number of ticks, we'll need to divide `micros()` by 100.
+This function seems bigger than it has to be: we _could_ just start the clock when our sketch starts, setting `lastTime=millis()` in `setup()`, and then in `getDelta` only have the `timeDelta` calculation and `lastTime` update, but that would be explicitly encoding "a lot of nothing" at the start of our MIDI file: we'd be counting the ticks for the first event relative to starting the program, rather than treating the first event as starting at tick zero. So instead, we explicitly encode the time that the first event happens as `startTime` and then we start delta calculation relative to that, instead.
 
 That then leaves updating our handlers:
 
 ```c++
-void handleNoteOn(byte CHANNEL, byte pitch, byte velocity) {
+void handleNoteOn(byte channel, byte pitch, byte velocity) {
   ...
   writeToFile(..., getDelta());
 }
 
-void handleNoteOff(byte CHANNEL, byte pitch, byte velocity) {
+void handleNoteOff(byte channel, byte pitch, byte velocity) {
   ...
   writeToFile(..., getDelta());
 }
 
-void handleControlChange(byte CHANNEL, byte controller_code, byte value) {
+void handleControlChange(byte channel, byte controller_code, byte value) {
   ...
   writeToFile(..., getDelta());
 }
 
-void handlePitchBend(byte CHANNEL, int bend_value) {
+void handlePitchBend(byte channel, int bend_value) {
   ...
   writeToFile(..., getDelta());
 }
@@ -282,7 +260,7 @@ void createMidiFile() {
     0x00, 0x00, 0x00, 0x06,   // chunk length (from this point on): 6 bytes
     0x00, 0x00,               // format: 0
     0x00, 0x01,               // number of tracks: 1
-    0x11, 0x94                // data rate: 4500 ticks per quaver/quarter note
+    0x01, 0xC2                // data rate: 450 ticks per quaver/quarter note
   };
   file.write(header, 14);
 
@@ -303,7 +281,7 @@ void createMidiFile() {
 
 Rather than explaining why we need this data, I will direct you to [The MIDI File Format](http://www.music.mcgill.ca/~ich/classes/mumt306/StandardMIDIfileformat.html) specification, but the short version is that this is all boiler plate bytecode if we want a single event stream MIDI file, with two custom values:
 
-1. we get to choose the data rate in the header, and we went with 4500 ticks per quaver/quarter note, and
+1. we get to choose the data rate in the header, and we went with 450 ticks per quaver/quarter note, and
 2. we also get to choose the "play speed", which we set just a touch under half a second per quaver/quarter note.
 
 You may also notice that we've set the track length to zero: normally this value gets set to the byte length of the track when you save a `.mid` file on, say, your computer, but we don't know what that length is yet. In fact, we're never going to make our code figure that out: we'll write a small [Python](https://python.org) script to help set that value only when it's important (e.g. when you're ready to import the data into whatever audio application you have that you want to load MIDI data into).
