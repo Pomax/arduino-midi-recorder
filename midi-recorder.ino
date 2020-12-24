@@ -33,8 +33,8 @@
 #define CHIP_SELECT 9
 #define HAS_MORE_BYTES 0x80
 
-#define NOTE_OFF_EVENT 0x80
-#define NOTE_ON_EVENT 0x90
+#define NOTE_OFF_EVENT 0x8C
+#define NOTE_ON_EVENT 0x9C
 #define CONTROL_CHANGE_EVENT 0xB0
 #define PITCH_BEND_EVENT 0xE0
 
@@ -109,7 +109,7 @@ void createMidiFile() {
     0x00, 0x00, 0x00, 0x06,   // chunk length (from this point on)
     0x00, 0x00,               // format 0
     0x00, 0x01,               // one track
-    0x11, 0x94                // data rate = 4500 ticks per quarter note
+    0x01, 0xC2                // data rate = 450 ticks per quarter note
   };
   file.write(header, 14);
 
@@ -188,10 +188,10 @@ void checkReset() {
    event that comes flying by.
 */
 void setPlayState() {
-  int sig = digitalRead(AUDIO_DEBUG_PIN);
-  if (sig != lastPlayState) {
-    lastPlayState = sig;
-    if (sig == 1) play = !play;
+  int playState = digitalRead(AUDIO_DEBUG_PIN);
+  if (playState != lastPlayState) {
+    lastPlayState = playState;
+    if (playState == 1) play = !play;
   }
 }
 
@@ -199,23 +199,23 @@ void setPlayState() {
 // ======================================================================================
 
 
-void handleNoteOff(byte CHANNEL, byte pitch, byte velocity) {
-  writeToFile(NOTE_OFF_EVENT | CHANNEL, pitch, velocity, getDelta());
+void handleNoteOff(byte channel, byte pitch, byte velocity) {
+  writeToFile(NOTE_OFF_EVENT, pitch, velocity, getDelta());
 }
 
-void handleNoteOn(byte CHANNEL, byte pitch, byte velocity) {
-  writeToFile(NOTE_ON_EVENT | CHANNEL, pitch, velocity, getDelta());
+void handleNoteOn(byte channel, byte pitch, byte velocity) {
+  writeToFile(NOTE_ON_EVENT, pitch, velocity, getDelta());
   if (play) tone(AUDIO, 440 * pow(2, (pitch - 69.0) / 12.0), 100);
 }
 
-void handleControlChange(byte CHANNEL, byte cc, byte value) {
-  writeToFile(CONTROL_CHANGE_EVENT | CHANNEL, cc, value, getDelta());
+void handleControlChange(byte channel, byte cc, byte value) {
+  writeToFile(CONTROL_CHANGE_EVENT, cc, value, getDelta());
 }
 
-void handlePitchBend(byte CHANNEL, int bend) {
+void handlePitchBend(byte channel, int bend) {
   byte lsb = (byte) (bend & 0x7F);
   byte msb = (byte) ((bend >> 7) & 0x7F);
-  writeToFile(PITCH_BEND_EVENT | CHANNEL, lsb, msb, getDelta());
+  writeToFile(PITCH_BEND_EVENT, lsb, msb, getDelta());
 }
 
 /**
@@ -223,12 +223,12 @@ void handlePitchBend(byte CHANNEL, int bend) {
 */
 int getDelta() {
   if (startTime == 0) {
-    startTime = micros();
+    startTime = millis();
     lastTime = startTime;
     return 0;
   }
-  unsigned long now = micros();
-  unsigned int delta = (now - lastTime) / 100;
+  unsigned long now = millis();
+  unsigned int delta = (now - lastTime);
   lastTime = now;
   return delta;
 }
@@ -283,3 +283,4 @@ void writeVarLen(File file, unsigned long value) {
      THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
  ********************************************************/
+ 
