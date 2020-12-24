@@ -63,7 +63,7 @@ And of course, the bits that you'll get with pretty much any Arduino starter kit
 
 ### The MIDI part of our recorder
 
-We set up MIDI-In on the Arduino `RX<-0` pin, with MIDI-Thru tapping straight into signal that's getting sent to `RX<-0`, too. The only tricky bit about this is that MIDI signals are isolated from the rest of the circuitry via an optocoupler (which gets around ground loop problems by literally transmitting signals by running them through a LED, which emits the signal as light, which then gets picked up by another LED and turned back into signal).
+We set up MIDI-In on the Arduino `RX<-0` pin, with MIDI-Thru tapping straight into signal that's getting sent to `RX<-0`, too. The only tricky bit about this is that MIDI signals are isolated from the rest of the circuitry via an optocoupler (which gets around ground loop problems by literally transmitting signals by running them through a LED, which emits the signal as light, which then gets picked up by another LED and turned back into signal). When placing and connecting the optocoupler, it is very important to make sure you know which pin is pin 1: it'll have a little mark next to it (typically a dot on the chip casing) to tell you that that side has pins 1 through 4 running top to bottom, and pins 5 through 8 on the other side _running bottom to top_.
 
 <img alt="MIDI circuit diagram" src="./MIDI.png" width="75%">
 
