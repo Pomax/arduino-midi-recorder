@@ -132,10 +132,10 @@ This sets up MIDI listening on all MIDI channels (there are sixteen of them, and
 That leaves implementing our MIDI event handling:
 
 ```c++
-#define NOTE_OFF_EVENT 0x8C
-#define NOTE_ON_EVENT 0x9C
-#define CONTROL_CHANGE_EVENT 0xB0
-#define PITCH_BEND_EVENT 0xE0
+#define NOTE_OFF_EVENT 0x81
+#define NOTE_ON_EVENT 0x91
+#define CONTROL_CHANGE_EVENT 0xB1
+#define PITCH_BEND_EVENT 0xE1
 
 void handleNoteOff(byte channel, byte pitch, byte velocity) {
   writeToFile(NOTE_OFF_EVENT, pitch, velocity);
@@ -160,7 +160,7 @@ void handlePitchBend(byte channel, int bend_value) {
   writeToFile(PITCH_BEND_EVENT, lowBits, highBits);
 }
 ```
-(note that we're ignoring the `channel` byte: we'll be creating a "simple" format 0 MIDI file, which requires that all automation data goes on channel 1 (which has hax nibble `0`) and all note data goes on channel 13 (which has hex nibble `C`))
+(note that we're ignoring the `channel` byte: we'll be creating a "simple" format 0 MIDI file, and for maximum usability in terms of importing our data in a DAW, we're putting all the events on channel 2)
 
 This is a good start, but MIDI events are just that: events, and events happen "at some specific time" which we're still going to have to capture. MIDI events don't rely on absolute time based on some kind of real time clock (which is good for us, because Arduino doesn't have an RTC built in!) and instead relies on counting a "time delta": it marks events with the number of "MIDI clock ticks" since the previous event, with the very first event in the event stream having an explicit time delta of zero.
 
