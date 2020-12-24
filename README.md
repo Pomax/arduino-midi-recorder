@@ -1,8 +1,22 @@
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Building an Arduino MIDI recorder">
+<meta name="twitter:description" content="Let's build an Arduino-based MIDI recorder, for fun and non-profit!">
+<meta name="twitter:image" content="https://pomax.github.io/arduino-midi-recorder/banner.jpg">
+<meta property="og:title" content="Building an Arduino MIDI recorder">
+<meta property="og:description" content="Let's build an Arduino-based MIDI recorder, for fun and non-profit!">
+<meta property="og:image" content="https://pomax.github.io/arduino-midi-recorder/banner.jpg">
+<meta property="og:site_name" content="pomax.github.io">
+<meta property="og:url" content="https://pomax.github.io/arduino-midi-controller">
+<meta itemprop="url" content="https://pomax.github.io/arduino-midi-controller">
+<meta itemprop="name" content="pomax.github.io">
+<meta itemprop="description" content="Let's build an Arduino-based MIDI recorder, for fun and non-profit!">
+<meta itemprop="image" content="https://pomax.github.io/arduino-midi-recorder/banner.jpg">
+
 # Creating a MIDI pass-through recorder
 
 If you've ever used audio softare on the computer, you probably know that MIDI exists: a signalling protocol that allows controllers to control vitual instruments like synths. It's also the protocol used by real audio hardware to talk to each, and you can think of it as the language in which devices talk about what they're doing, rather than what audio they're generating.
 
-As such, there are two ways to record instruments (real or virtual): record the sound they're making, or record the MIDI event that cause that sound to be made, and that's where things get interesting. 
+As such, there are two ways to record instruments (real or virtual): record the sound they're making, or record the MIDI event that cause that sound to be made, and that's where things get interesting.
 
 There are many, _many_ ways to record audio, from microphones to line monitors to audio interfaces, but not all that many ways to record MIDI events. Essentially: unless you're running software that monitors MIDI events, there isn't really any way to record MIDI. So I set out to change that: in the same way that you can just hook up an audio field recorder (like a Tuscan DR-05) to sit between an audio-out on something that generates audio and an audio-in on something that should be listening to that audio, writing that to an SD card as `.wav` or `.mp3` or the like,  I built a MIDI "field recorder" that you plug in between your MIDI-out and some MIDI-in, indiscriminately recording every MIDI event that gets sent over the wire to an SD card as a `.mid` file.
 
@@ -23,6 +37,8 @@ You'd think this would be something that already exists as a product you can jus
 1. [Comments/questions](#comments-and-or-questions)
 
 ## The circuitry
+
+<img src="banner.jpg" height="300">
 
 To build this, we're going to basically build a standard Arduino based MIDI pass-through, with an SD card circuit hooked up so we can save the data that comes flying by. To build everything, we'll need some special components:
 
@@ -141,7 +157,7 @@ void handleControlChange(byte CHANNEL, byte controller, byte value) {
 
 void handlePitchBend(byte CHANNEL, int bend_value) {
   byte event_type_on_channel = PITCH_BEND_EVENT | CHANNEL;
-  
+
   // Per the MIDI spec, bend_value is 14 bits, and needs
   // to be encoded as two 7-bit bytes, encoded as the
   // lowest 7 bits in the first byte, and the highest 7
@@ -379,7 +395,7 @@ So now if we start our program, and we press our button, playing notes on our MI
 
 Beep, beep!
 
-### Creating a new file when idling 
+### Creating a new file when idling
 
 Finally, the whole point of this recorder is to record MIDI... not to record an hour of silence because you stopped playing and  went off to do something else for a bit. To that end, what we would like is for our program to detect that you've _not_ been playing anything for a while (say, a few minutes) and then stop recording, starting recording on a new file when you _do_ start playing again.
 
