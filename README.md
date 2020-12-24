@@ -410,7 +410,9 @@ Beep, beep!
 
 ### Creating a new file when idling
 
-Finally, the whole point of this recorder is to record MIDI... not to record an hour of silence because you stopped playing and  went off to do something else for a bit. To that end, what we would like is for our program to detect that you've _not_ been playing anything for a while (say, a few minutes) and then stop recording, starting recording on a new file when you _do_ start playing again.
+There's one feature that's still missing... remember that the whole point of this recorder is to record the MIDI events that your MIDI-out device generates because you're using it. But what we _don't_ want it to do is "record an hour of silence because you stopped playing and went off to do something else for a bit"!
+
+To that end, what we would like is for our program to detect that you've _not_ been playing anything for a while (say, a few minutes) and then stop recording, starting recording on a new file when you _do_ start playing again.
 
 As it so happens, the first part is _constantly_ true, because we're only writing to our file when new data comes in, and we've _also_ already implemented the second part: that happens automatically when you turn on the Arduino, so the only thing we're missing is a way to detect whether there's not been any input for a while:
 
@@ -457,7 +459,7 @@ Finally, there's the `resetArduino()` "function". This doesn't look like any fun
 
 ## A final helper script
 
-One last thing we'll want to do is not actually related to circuits or Arduinos programming, but has to do with fixing a loose end: our track length.
+One last thing we'll want to do is not actually related to circuits or Arduino programming, but has to do with fixing a loose end: our track length.
 
 Remember that we're writing a MIDI file to our SD card, and MIDI files need to say how long each track is... but we don't know how long each track is because we're constantly changing the length with every MIDI event we're appending to the file.
 
