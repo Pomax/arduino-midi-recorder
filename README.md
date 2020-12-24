@@ -141,56 +141,56 @@ That leaves implementing our MIDI event handling:
 #define PITCH_BEND_EVENT 0xE0
 
 void handleNoteOff(byte CHANNEL, byte pitch, byte velocity) {
-  byte event_type_on_channel = NOTE_OFF_EVENT | CHANNEL;
-  write_to_file(event_type_on_channel, pitch, velocity);
+  byte eventTypeOnChannel = NOTE_OFF_EVENT | CHANNEL;
+  writeToFile(eventTypeOnChannel, pitch, velocity);
 }
 
 void handleNoteOn(byte CHANNEL, byte pitch, byte velocity) {
-  byte event_type_on_channel = NOTE_ON_EVENT | CHANNEL;
-  write_to_file(event_type_on_channel, pitch, velocity);
+  byte eventTypeOnChannel = NOTE_ON_EVENT | CHANNEL;
+  writeToFile(eventTypeOnChannel, pitch, velocity);
 }
 
 void handleControlChange(byte CHANNEL, byte controller, byte value) {
-  byte event_type_on_channel = CONTROL_CHANGE_EVENT | CHANNEL;
-  write_to_file(event_type_on_channel, controller, value);
+  byte eventTypeOnChannel = CONTROL_CHANGE_EVENT | CHANNEL;
+  writeToFile(eventTypeOnChannel, controller, value);
 }
 
 void handlePitchBend(byte CHANNEL, int bend_value) {
-  byte event_type_on_channel = PITCH_BEND_EVENT | CHANNEL;
+  byte eventTypeOnChannel = PITCH_BEND_EVENT | CHANNEL;
 
   // Per the MIDI spec, bend_value is 14 bits, and needs
   // to be encoded as two 7-bit bytes, encoded as the
   // lowest 7 bits in the first byte, and the highest 7
   // bits in the second byte:
-  byte low_7_bits = (byte) (bend_value & 0x7F);
-  byte high_7_bits = (byte) ((bend_value >> 7) & 0x7F);
+  byte low7bits = (byte) (bend_value & 0x7F);
+  byte high7bits = (byte) ((bend_value >> 7) & 0x7F);
 
-  write_to_file(event_type_on_channel, low_7_bits, high_7_bits);
+  writeToFile(eventTypeOnChannel, low7bits, high7bits);
 }
 ```
 
 This is a good start, but MIDI events are just that: events, and events happen "at some specific time" which we're still going to have to capture. MIDI events don't rely on absolute time based on some kind of real time clock (which is good for us, because Arduino doesn't have an RTC built in!) and instead relies on counting a "time delta": it marks events with the number of "MIDI clock ticks" since the previous event, with the very first event in the event stream having an explicit time delta of zero.
 
-So: let's write a `get_time_delta()` function that we can use to get the number of MIDI ticks since the last event (=since the last time `get_time_delta()` got called) so that we have all the data we need ready to start writing MIDI to file:
+So: let's write a `getTmeDelta()` function that we can use to get the number of MIDI ticks since the last event (=since the last time `getTmeDelta()` got called) so that we have all the data we need ready to start writing MIDI to file:
 
 ```c++
-unsigned long start_time = 0;
-unsigned long last_time = 0;
-unsigned int time_delta = 0;
+unsigned long startTime = 0;
+unsigned long lastTime = 0;
+unsigned int timeDelta = 0;
 
-int get_time_delta() {
-  if (start_time == 0) {
-    start_time = micros();
-    last_time = start_time;
+int getTmeDelta() {
+  if (startTime == 0) {
+    startTime = micros();
+    lastTime = startTime;
     return 0;
   }
-  time_delta = (micros() - last_time) / 100;
-  last_time += time_delta ;
+  timeDelta = (micros() - lastTime) / 100;
+  lastTime += timeDelta ;
   return delta;
 }
 ```
 
-This function seems bigger than it has to be: we _could_ just start the clock when our sketch starts, setting `last_time=micros()` in `setup()`, and then in `get_time_delta` only have the `time_delta` calculation and `last_time` update, but that would be explicitly encoding "a lot of nothing" at the start of our MIDI file: we'd be counting the ticks for the first event relative to starting the program, rather than treating the first event as starting at tick zero. So instead, we explicitly encode the time that the first event happens as `start_time` and then we start delta calculation relative to that, instead.
+This function seems bigger than it has to be: we _could_ just start the clock when our sketch starts, setting `lastTime=micros()` in `setup()`, and then in `getTmeDelta` only have the `timeDelta` calculation and `lastTime` update, but that would be explicitly encoding "a lot of nothing" at the start of our MIDI file: we'd be counting the ticks for the first event relative to starting the program, rather than treating the first event as starting at tick zero. So instead, we explicitly encode the time that the first event happens as `startTime` and then we start delta calculation relative to that, instead.
 
 You may also have noticed that we're (a) using `micros()` instead of the more common `millis()`, and (b) we're not even using that value directly, we're scaling it so that our ticks are 1/10,000th of a second instead. The reason here is that the MIDI spec links "the number of ticks per quaver/quarter note" and "the time it takes to play a quaver/quarter note" based on microseconds: in our case, we'll be defining a quaver/quarter note as taking 390,000μs, spanning an interval of 4000 ticks. So, in order to make sure there's we're using the correct scale for the number of ticks, we'll need to divide `micros()` by 100.
 
@@ -199,22 +199,22 @@ That then leaves updating our handlers:
 ```c++
 void handleNoteOn(byte CHANNEL, byte pitch, byte velocity) {
   ...
-  write_to_file(..., get_time_delta());
+  writeToFile(..., getTmeDelta());
 }
 
 void handleNoteOff(byte CHANNEL, byte pitch, byte velocity) {
   ...
-  write_to_file(..., get_time_delta());
+  writeToFile(..., getTmeDelta());
 }
 
 void handleControlChange(byte CHANNEL, byte controller_code, byte value) {
   ...
-  write_to_file(..., get_time_delta());
+  writeToFile(..., getTmeDelta());
 }
 
 void handlePitchBend(byte CHANNEL, int bend_value) {
   ...
-  write_to_file(..., get_time_delta());
+  writeToFile(..., getTmeDelta());
 }
 ```
 
@@ -234,14 +234,14 @@ void setup() {
   pinMode(CHIP_SELECT, OUTPUT);
 
   if (SD.begin(CHIP_SELECT)) {
-    find_next_filename();
+    findNextFilename();
     if (file) {
-      create_midi_file();
+      createMidiFile();
     }
   }
 }
 
-void find_next_filename() {
+void findNextFilename() {
   for (int i = 1; i < 1000; i++) {
     filename = "file-";
     if (i < 10) filename += "0";
@@ -250,15 +250,10 @@ void find_next_filename() {
     filename += String(".mid");
 
     if (!SD.exists(filename)) {
-      open_file();
+      file = SD.open(filename, FILE_WRITE);
       return;
     }
   }
-}
-
-void open_file() {
-  if (file) file.close();
-  file = SD.open(filename, FILE_WRITE);
 }
 ```
 
@@ -269,7 +264,7 @@ So: while this is _also_ silly, it's less silly and we're rolling with it.
 Next, when we have a filename that works we open the file in `FILE_WRITE` mode, which --perhaps counter-intuitively-- means we'll be opening the file in `APPEND` mode: we have read/write access, but the file point is "stuck" at the end of the file and any data we write gets appended to what's already there. For MIDI files, which are essentially streams of events, that's exactly what we need, so we move on: we need to write a bit of boilerplate data into our new file, after which we can start dealing with recording actual MIDI events that we see flying by in the MIDI handlers we wrote in the previous section.
 
 ```c++
-void create_midi_file() {
+void createMidiFile() {
   byte header[] = {
     0x4D, 0x54, 0x68, 0x64,   // "MThd" chunk
     0x00, 0x00, 0x00, 0x06,   // chunk length (from this point on): 6 bytes
@@ -291,6 +286,8 @@ void create_midi_file() {
     0x05, 0xF3, 0x70          // tempo value: 390,000μs per quaver/quarter note
   };
   file.write(tempo, 7);
+
+  file.flush();
 }
 ```
 
@@ -301,24 +298,24 @@ Rather than explaining why we need this data, I will direct you to [The MIDI Fil
 
 You may also notice that we've set the track length to zero: normally this value gets set to the byte length of the track when you save a `.mid` file on, say, your computer, but we don't know what that length is yet. In fact, we're never going to make our code figure that out: we'll write a small [Python](https://python.org) script to help set that value only when it's important (e.g. when you're ready to import the data into whatever audio application you have that you want to load MIDI data into).
 
-And with that, it's time to get to the entire reason you're reading along: the code that writes incoming MIDI signals to our file: let's implement `write_to_file`:
+And with that, it's time to get to the entire reason you're reading along: the code that writes incoming MIDI signals to our file: let's implement `writeToFile`:
 
 ```c++
-void write_to_file(byte eventType, byte b1, byte b2, int delta) {
+void writeToFile(byte eventType, byte b1, byte b2, int delta) {
   if (!file) return;
-  write_var_len(delta);
+  writeVarLen(delta);
   file.write(eventType);
   file.write(b1);
   file.write(b2);
 }
 ```
 
-That's... that's not a lot of code. And the reason it's not a lot of code is that MIDI was intended to be super small both to send and to read/write. The only tricy part is the `write_var_len()` function, which turns integers into their corresponding byte sequences. Thankfully, the MIDI spec handily provides the code necessary to achieve this, so we simply adopt that for our Arduino program and we're good to go:
+That's... that's not a lot of code. And the reason it's not a lot of code is that MIDI was intended to be super small both to send and to read/write. The only tricy part is the `writeVarLen()` function, which turns integers into their corresponding byte sequences. Thankfully, the MIDI spec handily provides the code necessary to achieve this, so we simply adopt that for our Arduino program and we're good to go:
 
 ```c++
 #define HAS_MORE_BYTES 0x80
 
-void write_var_len(unsigned long value) {
+void writeVarLen(unsigned long value) {
   unsigned long buffer = value & 0x7f;
 
   while ((value >>= 7) > 0) {
@@ -347,7 +344,7 @@ With MIDI handling and file writing taken care of, one thing that's just a nice-
 ```c++
 #define AUDIO_DEBUG_PIN 2
 
-int last_play_state = 0;
+int lastPlayState = 0;
 bool play = false;
 
 void setup() {
@@ -355,13 +352,13 @@ void setup() {
 }
 
 void loop() {
-  set_play_state();
+  setPlayState();
 }
 
-void set_play_state() {
+void setPlayState() {
   int sig = digitalRead(AUDIO_DEBUG_PIN);
-  if (sig != last_play_state) {
-    last_play_state = sig;
+  if (sig != lastPlayState) {
+    lastPlayState = sig;
     if (sig == 1) play = !play;
   }
 }
@@ -373,7 +370,7 @@ With that part covered, let's add some beeps so that when we press a key on our 
 
 ```c++
 void handleNoteOn(byte CHANNEL, byte pitch, byte velocity) {
-  write_to_file(NOTE_ON_EVENT | CHANNEL, pitch, velocity, get_time_delta());
+  writeToFile(NOTE_ON_EVENT | CHANNEL, pitch, velocity, getTmeDelta());
   if (play) tone(AUDIO, 440 * pow(2, (pitch - 69.0) / 12.0), 100);
 }
 ```
@@ -405,23 +402,23 @@ As it so happens, the first part is _constantly_ true, because we're only writin
 #define RECORDING_TIMEOUT = 120000000
 // 2 minutes, counted in microseconds
 
-unsigned long last_loop_counter = 0;
-unsigned long loop_counter = 0;
+unsigned long lastLoopCounter = 0;
+unsigned long loopCounter = 0;
 
 void loop() {
-  loop_counter = millis();
-  if (loop_counter - last_loop_counter > 400) {
-    check_reset();
-    last_loop_counter = loop_counter;
+  loopCounter = millis();
+  if (loopCounter - lastLoopCounter > 400) {
+    checkReset();
+    lastLoopCounter = loopCounter;
     file.flush();
   }
 }
 
-void check_reset() {
+void checkReset() {
   if (!file) return;
-  if (micros() - last_time > RECORDING_TIMEOUT) {
+  if (micros() - lastTime > RECORDING_TIMEOUT) {
     file.close();
-    if (start_time == 0) SD.remove(filename);
+    if (startTime == 0) SD.remove(filename);
     reset_arduino();
   }
 }
@@ -431,7 +428,7 @@ void(* reset_arduino) (void) = 0;
 
 That might do more than you thought, so let's look at what's happening.
 
-First, we want to check whether any MIDI activity has happened during the program loop, but we _don't_ want to check that 32,150 times each second. So, instead, we set up some standard code to check every 400 milliseconds, where we check whether the difference between the `last_time` (which is the microsecond timestamp for the last MIDI event) and the current `micros()` value is more than 2 minutes, counted in microseconds. If it is, then we're just idling and we can restart the Arduino to start a new file. However, we don't want to create a million (or, hundreds, since we only allow 999 files in this program) files that are all 29 bytes long because they contain the boilerplate MIDI code but nothing else, so if the Arduino has been idling _without_ any MIDI event having been seen yet, we delete the currently open file first, so that when the Arduino restarts, it will create "the same file" and it'll be as if we've hit rewind on the current file, rather than having restarted.
+First, we want to check whether any MIDI activity has happened during the program loop, but we _don't_ want to check that 32,150 times each second. So, instead, we set up some standard code to check every 400 milliseconds, where we check whether the difference between the `lastTime` (which is the microsecond timestamp for the last MIDI event) and the current `micros()` value is more than 2 minutes, counted in microseconds. If it is, then we're just idling and we can restart the Arduino to start a new file. However, we don't want to create a million (or, hundreds, since we only allow 999 files in this program) files that are all 29 bytes long because they contain the boilerplate MIDI code but nothing else, so if the Arduino has been idling _without_ any MIDI event having been seen yet, we delete the currently open file first, so that when the Arduino restarts, it will create "the same file" and it'll be as if we've hit rewind on the current file, rather than having restarted.
 
 Also note that we're closing our file before we reset: as long as our file handle is open, the actual on-disk state is _unknown_ and it's entirely possible for our SD card to show a 0 byte file, so we want to explicitly close the file handle before we reset. This is also why you're seeing that `file.flush()`, which runs (without closing the file) if we're not resetting: we want to make sure that the on-disk file is kept reasonably in sync with the data we've been recording, keeping the SD controller's file buffer nice and small.
 
