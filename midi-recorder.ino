@@ -33,10 +33,10 @@
 #define CHIP_SELECT 9
 #define HAS_MORE_BYTES 0x80
 
-#define NOTE_OFF_EVENT 0x8C
-#define NOTE_ON_EVENT 0x9C
-#define CONTROL_CHANGE_EVENT 0xB0
-#define PITCH_BEND_EVENT 0xE0
+#define NOTE_OFF_EVENT 0x81
+#define NOTE_ON_EVENT 0x91
+#define CONTROL_CHANGE_EVENT 0xB1
+#define PITCH_BEND_EVENT 0xE1
 
 #define RECORDING_TIMEOUT 120000000
 // 2 minutes, counted in microseconds
