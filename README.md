@@ -1,12 +1,14 @@
 # Creating a MIDI pass-through recorder
 
-If you've ever used audio softare on the computer, you probably know that MIDI exists: a signalling protocol that allows controllers to control vitual instruments like synths. It's also the protocol used by real audio hardware to talk to each, and you can think of it as the language in which devices talk about what they're doing, rather than what audio they're generating.
+If you've ever used audio softare on the computer, you probably know that MIDI exists: a signalling protocol that allows controllers to control vitual instruments like synths. It's also the protocol used by real audio hardware to talk to each, and you can think of it as the language in which, rathar than communicating a fluctuating voltage signal or series of discrete sample values, devices talk about what is being done on them ("A4 got pressed", "F4 got released",  "the mod wheel moved down", etc).
 
-As such, there are two ways to record instruments (real or virtual): record the sound they're making, or record the MIDI event that cause that sound to be made, and that's where things get interesting.
+As such, there are two ways to record digital instruments (real or virtual): you can record the sound they're making, or you can record the MIDI events that cause them to make those sounds, and that's where things get interesting.
 
-There are many, _many_ ways to record audio, from microphones to line monitors to audio interfaces, but not all that many ways to record MIDI events. Essentially: unless you're running software that monitors MIDI events, there isn't really any way to record MIDI. So I set out to change that: in the same way that you can just hook up an audio field recorder (like a Tascam DR-05) to sit between an audio-out on something that generates audio and an audio-in on something that should be listening to that audio, writing that to an SD card as `.wav` or `.mp3` or the like,  I built a MIDI "field recorder" that you plug in between your MIDI-out and some MIDI-in, indiscriminately recording every MIDI event that gets sent over the wire to an SD card as a `.mid` file.
+There are many, _many_ ways to record audio, from microphones to line monitors to audio interfaces, on dedicated hardware, computers, phones, etc. etc., but there aren't all that many ways to record MIDI events. Essentially: unless you're running software that monitors MIDI events, there just isn't really any way to record MIDI. So I set out to change that: in the same way that you can just hook up an audio field recorder (like a Tascam DR-05) to sit between an audio-out on something that generates audio and an audio-in on something that should be listening to that audio, writing that to an SD card as `.wav` or `.mp3` or the like,  I built a MIDI "field recorder" that you plug in between your MIDI-out and some MIDI-in, indiscriminately recording every MIDI event that gets sent over the wire to an SD card as a `.mid` file.
 
-You'd think this would be something that already exists as a product you can just buy. Amazingly, it is not. So if you want one too, you'll have to build one, and if you want to build one, this post might be useful to you!
+You'd think this would be something that already exists as a product you can just buy (even if at probably quite the markup because it's made of "powder-coated extruded aluminium" with "audiophile quality" components, but still). Amazingly, it is not. There's just nothing.
+
+So: if you want a MIDI recorder, you'll have to build one... and if you want to build one, this post might be useful to you!
 
 
 ## Table of contents
