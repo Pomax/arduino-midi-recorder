@@ -32,7 +32,7 @@ So: if you want a MIDI recorder, you'll have to build one... and if you want to 
 
 <a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/banner.jpg" target="_blank"><img src="banner.jpg" width="100%"></a>
 
-To build this, we're going to basically build a standard "MIDI-In + MIDI-Thru" circuit using an Arduino, with an SD card circuit hooked up so we can save the data that comes flying by. To build everything, we'll need some special components:
+To build this, we're going to basically build a standard "MIDI-In + MIDI-Thru" circuit using an Arduino, with an SD card module hooked up so we can save the data that comes flying by. To build everything, we'll need some special components:
 
 1. An Arduino SD card module (~$10 for a pack of five)
 1. Two female 5-pin DIN connectors (~$5 for a pack of ten)
