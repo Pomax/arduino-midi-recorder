@@ -499,31 +499,32 @@ That's it, all that reminds is to assemble the circuits, and put all the code to
 
 Now that you've got something that create `.mid` files, you'll probably want to import those `.mid` files into your DAW: depending on your choice in DAW that may or may not be straightforward, so here are the various ways in which do achieve an import in some common DAWs, and if you use a different DAW but know how to import a `.mid` including its automation, let me know and we can add it to the list!
 
-### Ableton Live 10
 
-Super Easy: go to the `Arrangement View` and just drag the `.mid` file onto a MIDI track. Congratulations, you are done =)
+### Reaper 6 (Cockos)
 
-(to _see_ the  automation, turn on the `Envelope Box` in the channel strip: click the "linked dots" icon to the right of the music note icon at the bottom of the `clip` channel strip module, then pick the control you want to see the automation for in the `Envelopes` channel strip module to the right)
+Drag the `.mid` file onto a track.
 
 
 ### Studio One 5 (Presonus)
 
-Super Easy: drag the `.mid` file onto a track. Congratulations, you are done =)
+Drag the `.mid` file onto a track.
 
 
-### Reaper 6 (Cockos)
+### Ableton Live 10
 
-Super Easy: drag the `.mid` file onto a track. Congratulations, you are done =)
+Go to the `Arrangement View` and drag the `.mid` file onto a MIDI track.
+
+(to _see_ the  automation, turn on the `Envelope Box` in the channel strip: click the "linked dots" icon to the right of the music note icon at the bottom of the `clip` channel strip module, then pick the control you want to see the automation for in the `Envelopes` channel strip module to the right)
 
 
 ### FL Studio 20 (Image-Line)
 
-1. Importing note data: super easy.
-1. Importing automation: super complicated.
+1. Importing note data: pretty easy.
+1. Importing automation: really effing complicated.
 
-Drop your `.mid` file onto a pattern's `Piano roll`. This will prompt you on what to import, import everything, and you'll have imported the note data.
+Drop your `.mid` file onto a pattern's `Piano roll` (_not_ the pattern window). This will prompt you for which channels should be imported: import everything, and you'll have imported the note data.
 
-That covers the easy part, on to the complicated part:
+That covers the easier part, leaving the bizarrely complicated part:
 
 To import the automation, things get considerably more annoying than they are in Ableton: [The official documentation is here](https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/automation_midiimport.htm) but that can only import CC data, so if you're also using Pitch Bend, you're out of luck, because Pitch Bend is not a CC message, but its own code (on the same footing as note on/off and CC).
 
