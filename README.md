@@ -1,6 +1,6 @@
 # Creating a MIDI pass-through recorder
 
-If you've ever used audio softare on the computer, you probably know that MIDI exists: a signalling protocol that allows controllers to control vitual instruments like synths. It's also the protocol used by real audio hardware to talk to each, and you can think of it as the language in which, rathar than communicating a fluctuating voltage signal or series of discrete sample values, devices talk about what is being done on them ("A4 got pressed", "F4 got released",  "the mod wheel moved down", etc).
+If you've ever used audio software on the computer, you probably know that MIDI exists: a signalling protocol that allows controllers to control vitual instruments like synths. It's also the protocol used by real audio hardware to talk to each, and you can think of it as the language in which, rathar than communicating a fluctuating voltage signal or series of discrete sample values, devices talk about what is being done on them ("A4 got pressed", "F4 got released",  "the mod wheel moved down", etc).
 
 As such, there are two ways to record digital instruments (real or virtual): you can record the sound they're making, or you can record the MIDI events that cause them to make those sounds, and that's where things get interesting.
 
