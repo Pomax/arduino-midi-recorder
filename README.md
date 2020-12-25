@@ -506,10 +506,20 @@ Super Easy: go to the `Arrangement View` and just drag the `.mid` file onto a MI
 (to _see_ the  automation, turn on the `Envelope Box` in the channel strip: click the "linked dots" icon to the right of the music note icon at the bottom of the `clip` channel strip module, then pick the control you want to see the automation for in the `Envelopes` channel strip module to the right)
 
 
-### Image-Line's FL Studio 20
+### Studio One 5 (Presonus)
 
-Note data: super easy.
-Automation: super complicated.
+Super Easy: drag the `.mid` file onto a track. Congratulations, you are done =)
+
+
+### Reaper 6 (Cockos)
+
+Super Easy: drag the `.mid` file onto a track. Congratulations, you are done =)
+
+
+### FL Studio 20 (Image-Line)
+
+1. Importing note data: super easy.
+1. Importing automation: super complicated.
 
 Drop your `.mid` file onto a pattern's `Piano roll`. This will prompt you on what to import, import everything, and you'll have imported the note data.
 
@@ -518,16 +528,6 @@ That covers the easy part, on to the complicated part:
 To import the automation, things get considerably more annoying than they are in Ableton: [The official documentation is here](https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/automation_midiimport.htm) but that can only import CC data, so if you're also using Pitch Bend, you're out of luck, because Pitch Bend is not a CC message, but its own code (on the same footing as note on/off and CC).
 
 A better solution is described by user NTO [on the FL Studio forum](https://forum.image-line.com/viewtopic.php?f=100&t=163314&hilit=TypeCnvrt&p=1163949#p1163949) but even so, it's much harder than it should be and if you're an FL Studio user you should probably file a feature request. The more of us do, the more they'll know it's something folks care about and the more likely it is they can justify spending time on fixing MIDI importing =)
-
-
-### Presonus' Studio One 5
-
-Super Easy: drag the `.mid` file onto a track. Congratulations, you are done =)
-
-
-### Reaper 6
-
-Super Easy: drag the `.mid` file onto a track. Congratulations, you are done =)
 
 
 ## Comments and/or questions
