@@ -17,6 +17,7 @@ So: if you want a MIDI recorder, you'll have to build one... and if you want to 
    1. [MIDI](#the-midi-part-of-our-recorder)
    1. [SD card](#the-sd-part-of-our-recorder)
    1. [All the beeps](#adding-a-beep-for-debugging)
+   1. [Adding a MIDI marker button](#adding-a-midi-marker-button)
 1. [The software](#the-software)
    1. [Basics](#program-basics)
    1. [MIDI handling](#midi-handling)
@@ -73,7 +74,7 @@ Also, we're going to add a little piezo speaker and a button that we can press t
 
 <img alt="beep beep button diagram" src="./button.png" width="50%">
 
-### Adding another beep, but not for beeping
+### Adding a MIDI marker button
 
 We're also going to add a second button, which we'll connect to pin 4. However, rather than using it to generate beeps, we'll use it to generate MIDI markers in our file, so that it's easier to find particularly "worth revisiting" parts of what it recorded.
 
