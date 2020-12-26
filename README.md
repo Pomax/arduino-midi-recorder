@@ -480,7 +480,7 @@ for filename in midi_files:
 
     # And then we write the update to our file:
     file.seek(18)
-    file.write(file_value)
+    file.write(field_value)
     file.close()
     print(f"Updated {filename} track length to {track_length}")
 ```
