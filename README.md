@@ -26,7 +26,7 @@ So: if you want a MIDI recorder, you'll have to build one... and if you want to 
    1. [Making some beeps](#making-some-beeps)
    1. [idle handling](#creating-a-new-file-when-idling)
    1. [A final helper script](#a-final-helper-script)
-1. [Importing into your DAW](#importing-into-your-daw)
+1. [Importing MIDI data into your DAW](#importing-midi-data-into-your-daw)
 1. [Comments/questions](#comments-and-or-questions)
 
 
@@ -410,7 +410,7 @@ void writeMidiMarker() {
 }
 ```
 
-And that's it! However, note that if you want to use markers you should be aware of whether or not your preferred DAW of choice supports them. Not all of them do, and some of them make importing markers rather _a lot_ harder than it reasonably should be. So depending on which DAW you use, you might still want to tap C1-C6-C1-C6-C1-C6 or something as visual cue =(
+And that's it! However, note that if you want to use markers you should be aware of [whether or not your preferred DAW of choice supports them](#importing-midi-data-into-your-daw). Not all of them do, and some of them make importing markers rather _a lot_ harder than it reasonably should be. So depending on which DAW you use, you might still want to tap C1-C6-C1-C6-C1-C6 or something as visual cue =(
 
 
 ### Making some beeps
@@ -568,7 +568,7 @@ Now, every time we want to load our `.mid` files from SD card into a DAW or othe
 That's it, all that reminds is to assemble the circuits, and put all the code together, and you have yourself an Arduino MIDI recorder! Thanks for reading along, and if you put this together and put it to good use, shoot me a message! I love hearing from folks who put what I make to good use (or _bad_!) use =D
 
 
-## Importing into your DAW
+## Importing MIDI data into your DAW
 
 Now that you've got something that create `.mid` files, you'll probably want to import those `.mid` files into your DAW: depending on your choice in DAW that may or may not be straightforward, so here are the various ways in which do achieve an import in some common DAWs, and if you use a different DAW but know how to import a `.mid` including its automation, let me know and we can add it to the list!
 
