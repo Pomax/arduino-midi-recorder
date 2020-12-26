@@ -363,7 +363,7 @@ void setup() {
 }
 ```
 
-And then let's we can add MIDI marker file-writing whenever someone presses the button:
+And then let's make sure we can add MIDI marker file-writing whenever someone presses the button:
 
 ```c++
 void loop() {
@@ -383,7 +383,9 @@ void checkForMarker() {
 
 The only special thing that's going on here is that when we press our button, we want that the program to know that it should write a MIDI marker to our SD card, so during the program loop we check to see if there's a "high" signal coming from our button. If there is, then we're pressing it, and we check whether we were previously _not_ pressing it so that we only do something "when the button gets pressed" rather than "for as long as the button is kept pressed". (If we didn't check whether the previous state was low, we'd end up writing MIDI markers to our SD card 32,150 times a second. Which would be bad!)
 
-That leaves implementing the `writeMidiMarker()` function, which needs to write a MIDI event like any other, using a time delta, the code `FF 06` to indicate this will be a MIDI marker, and a label (in ASCII) + "how many bytes in the label" value (although for parsing reasons, those last two are ordered as length first, then string data):
+That leaves implementing the `writeMidiMarker()` function, which needs to write a MIDI event like any other, using a time delta, the code `FF 06` to indicate this will be a MIDI marker, and a label (in ASCII) + "how many bytes in the label" value (although for parsing reasons, those last two are ordered as length first, then string data).
+
+We're not going to get fancy with our labels: plain numbers will do, with our first marker having label `1`, the next having label `2`, etc. That sounds simple enough, but we do need to save those as _text_, not as numbers, so we'll need to be careful with the length: `1` has length 1, but `12` has length 2 because it's two characters long:
 
 ```c++
 void writeMidiMarker() {
@@ -398,8 +400,8 @@ void writeMidiMarker() {
   byte len = 1;
   if (nextMarker > 9) len++;
   if (nextMarker > 99) len++;
-  if (nextMarker > 999) len++; // at this point, I don't think this is the right hardware for you...
-  file.write(len);
+  if (nextMarker > 999) len++; // though at this point, I don't think this is the right hardware for you...
+  writeVarLen(file, len);
 
   // our label:
   byte marker[len];
