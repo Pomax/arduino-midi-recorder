@@ -21,6 +21,7 @@ So: if you want a MIDI recorder, you'll have to build one... and if you want to 
    1. [Basics](#program-basics)
    1. [MIDI handling](#midi-handling)
    1. [File management](#file-management)
+   1. [Saving MIDI markers](#saving-midi-markers)   
    1. [Making some beeps](#making-some-beeps)
    1. [idle handling](#creating-a-new-file-when-idling)
    1. [A final helper script](#a-final-helper-script)
@@ -41,11 +42,11 @@ To build this, we're going to basically build a standard "MIDI-In + MIDI-Thru" c
 And of course, the bits that you'll get with pretty much any Arduino starter kit:
 
 1. An Arduino UNO R3 or equivalent board
-1. 3x 220 ohm resistors
+1. 4x 220 ohm resistors
 1. 1x 4.7k ohm resistor
 1. A diode
 1. A piezo buzzer
-1. A clicky pushy button
+1. Two clicky pushy buttons
 
 
 ### The MIDI part of our recorder
@@ -72,14 +73,18 @@ Also, we're going to add a little piezo speaker and a button that we can press t
 
 <img alt="beep beep button diagram" src="./button.png" width="50%">
 
+### Adding another beep, but not for beeping
+
+We're also going to add a second button, which we'll connect to pin 4. However, rather than using it to generate beeps, we'll use it to generate MIDI markers in our file, so that it's easier to find particularly "worth revisiting" parts of what it recorded.
 
 ## The Software
 
 With the circuitry set up, let's start writing our program, focussing on dealing with each circuit in its own section
 
-1. [program basics](#program-basics)
-1. [basic signal handling (MIDI library)](#midi-handling)
-1. [basic file writing (SD library)](#file-management)
+1. [Program basics](#program-basics)
+1. [Basic signal handling (MIDI library)](#midi-handling)
+1. [Basic file writing (SD library)](#file-management)
+1. [Saving MIDI markers](#saving-midi-markers)
 1. [Audio debugging (beep beep)](#making-some-beeps)
 1. [Usability bonus: "clean restart" on idle](#creating-a-new-file-when-idling)
 1. [Usability bonus 2: "fix the track length" script](#a-final-helper-script)
@@ -336,6 +341,71 @@ void writeVarLen(unsigned long value) {
 This allocates 4 bytes and then copies the input value in 7-bit chunks for each byte, with the byte's highest bit set to `0` if there's going to be another byte, or `1` if this is the last byte. This turns the input value into a buffer that has MSBF-ordered bits-per-byte, but LSBF-ordered bytes-per-buffer. The `while(true)` then writes those bytes to file in reverse, so they end up MSBF-ordered in the file. Nothing fancy, but just fancy enough to be fast.
 
 
+### Saving MIDI markers
+
+Sometimes you play something you like enough that you want to make sure you don't have to hunt for it later, but have a convenient marker that you can look for instead. You could go "that was great, let me play C1-C6-C1-C6-C1-C6 so I have a visual cue later!" but that's kind of silly when MIDI allows you to place markers: let's write some code that lets us place markers with the push of a button!
+
+First, we hook up our marker button on pin 4:
+
+```c++
+#define PLACE_MARKER_PIN 4
+
+int lastMarkState = 0;
+int nextMarker = 1;
+
+void setup() {
+  pinMode(PLACE_MARKER_PIN, INPUT);
+}
+```
+
+And then let's we can add MIDI marker file-writing whenever someone presses the button:
+
+```c++
+void loop() {
+  checkForMarker();
+}
+
+void checkForMarker() {
+  int markState = digitalRead(PLACE_MARKER_PIN);
+  if (markState  != lastMarkState) {
+    lastMarkState = markState;
+    if (markState == 1) {
+      writeMidiMarker();
+    }
+  }
+}
+```
+
+The only special thing that's going on here is that when we press our button, we want that the program to know that it should write a MIDI marker to our SD card, so during the program loop we check to see if there's a "high" signal coming from our button. If there is, then we're pressing it, and we check whether we were previously _not_ pressing it so that we only do something "when the button gets pressed" rather than "for as long as the button is kept pressed". (If we didn't check whether the previous state was low, we'd end up writing MIDI markers to our SD card 32,150 times a second. Which would be bad!)
+
+That leaves implementing the `writeMidiMarker()` function, which needs to write a MIDI event like any other, using a time delta, the code `FF 06` to indicate this will be a MIDI marker, and a label (in ASCII) + "how many bytes in the label" value (although for parsing reasons, those last two are ordered as length first, then string data):
+
+```c++
+void writeMidiMarker() {
+  if (!file) return;
+
+  // delta + op code
+  writeVarLen(file, getDelta());
+  file.write(0xFF);
+  file.write(0x06);
+
+  // how many bytes are we writing?
+  byte len = 1;
+  if (nextMarker > 9) len++;
+  if (nextMarker > 99) len++;
+  if (nextMarker > 999) len++; // at this point, I don't think this is the right hardware for you...
+  file.write(len);
+
+  // our label:
+  byte marker[len];
+  String(nextMarker++).getBytes(marker, len);
+  file.write(marker, len);
+}
+```
+
+And that's it! However, note that if you want to use markers you should be aware of whether or not your preferred DAW of choice supports them. Not all of them do, and some of them make importing markers rather _a lot_ harder than it reasonably should be. So depending on which DAW you use, you might still want to tap C1-C6-C1-C6-C1-C6 or something as visual cue =(
+
+
 ### Making some beeps
 
 With MIDI handling and file writing taken care of, one thing that's just a nice-to-have is being able to confirm that your MIDI event handling works, for which we're going to use our "speaker" and button for. First, we set up the code that lets us decide whether to beep, or not to beep:
@@ -363,11 +433,7 @@ void setPlayState() {
 }
 ```
 
-The only special thing that's going on here is that when we press our button, we want that the program to know that it can now play audio (or not), so we track whether we should make sound with the `play` boolean, and then during the program loop we check to see if there's a "high" signal coming from our button. If there is, then we're pressing it, and we check whether we were previously _not_ pressing it.
-
-If that's the case, we can toggle our `play` state.
-
-The reason we do this, rather than just toggling `play` when we see that the signal from the button is high, is that we _only_ want to toggle the moment the button gets pressed down, not when you're holding it down. After all, if we did that, the `play` state would be flip-flopping between true and false every single time `loop()` runs, which would be 32,150 times a second for as long as you hold the button down!
+We use the same "check signal goes from low to high" as for our MIDI marker button, except we use it to toggle the `play` boolean: if it was `false`, we flip it to `true`, and if it was `true`, we flip it to `false`.
 
 So, with that part covered, let's add some beeps so that when we press a key on our MIDI device, we hear the corresponding note in all its pristine, high quality piezo-buzz audio:
 
@@ -502,33 +568,50 @@ Now that you've got something that create `.mid` files, you'll probably want to 
 
 ### Reaper 6 (Cockos)
 
+Drag the `.mid` file onto a track. If you have MIDI markers, you will be given the option to import them.
+
+To view your automation data, open the track's piano roll and use the events picker below the keyboard.
+
+
+### Cubase 11 (Steinberg)
+
 Drag the `.mid` file onto a track.
+
+To view your automation data, open the track's piano roll and use the events picker below the keyboard.
 
 
 ### Studio One 5 (Presonus)
 
 Drag the `.mid` file onto a track.
 
+To view your automation data, select and double-click the track to open its piano roll, and use the events buttons below the piano roll/above the events pane.
+
+Importing markers is _technically_ possible, but it might as well not be: see https://www.youtube.com/watch?v=Se1Anm1-yaw for how needlessly complicated this is.
+
 
 ### Ableton Live 10
 
-Go to the `Arrangement View` and drag the `.mid` file onto a MIDI track.
+Drag the `.mid` file onto a MIDI track.
 
-(to _see_ the  automation, turn on the `Envelope Box` in the channel strip: click the "linked dots" icon to the right of the music note icon at the bottom of the `clip` channel strip module, then pick the control you want to see the automation for in the `Envelopes` channel strip module to the right)
+To view your automation data, open the track's piano roll and turn on the `Envelope Box` in the channel strip (click the "linked dots" icon to the right of the music note icon at the bottom of the `clip` channel strip module) then pick the control you want to see the automation for in the `Envelopes` channel strip module to the right.
+
+Importing markers is not possible.
 
 
 ### FL Studio 20 (Image-Line)
 
-1. Importing note data: pretty easy.
-1. Importing automation: really effing complicated.
+FL Studio is very behind the curve when it comes to importing MIDI data, so if you're an FL Studio user:
 
-Drop your `.mid` file onto a pattern's `Piano roll` (_not_ the pattern window). This will prompt you for which channels should be imported: import everything, and you'll have imported the note data.
+1. Importing note data is easy.
+1. Importing automation is complicated.
+1. Importing pitch bend is impossible.
+1. Importing MIDI markers is impossible.
 
-That covers the easier part, leaving the bizarrely complicated part:
+I don't know why Image-Line decided not to make this as easy as the competition, but whatever the reasons were: those have long since stopped making sense.
 
-To import the automation, things get considerably more annoying than they are in Ableton: [The official documentation is here](https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/automation_midiimport.htm) but that can only import CC data, so if you're also using Pitch Bend, you're out of luck, because Pitch Bend is not a CC message, but its own code (on the same footing as note on/off and CC).
+Drag the `.mid` file onto a pattern's `Piano roll` (_not_ into the pattern window as you might expect). This will prompt you for which channels should be imported: import everything, and you'll have imported the note data.
 
-A better solution is described by user NTO [on the FL Studio forum](https://forum.image-line.com/viewtopic.php?f=100&t=163314&hilit=TypeCnvrt&p=1163949#p1163949) but even so, it's much harder than it should be and if you're an FL Studio user you should probably file a feature request. The more of us do, the more they'll know it's something folks care about and the more likely it is they can justify spending time on fixing MIDI importing =)
+To import CC automation, [please see the official documentation here](https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/automation_midiimport.htm).
 
 
 ## Comments and/or questions
