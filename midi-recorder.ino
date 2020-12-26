@@ -231,7 +231,7 @@ void writeMidiMarker() {
   if (nextMarker > 9) len++;
   if (nextMarker > 99) len++;
   if (nextMarker > 999) len++;
-  file.write(len);
+  writeVarLen(file, len);
 
   // our label:
   byte marker[len];
