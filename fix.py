@@ -15,6 +15,6 @@ for filename in midi_files:
     ])
 
     file.seek(18)
-    file.write(file_value)
+    file.write(field_value)
     file.close()
     print(f"Updated {filename} track length to {track_length}")
