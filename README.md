@@ -67,16 +67,20 @@ However, note that your SD card module **may have a different pin layout** so be
 
 <img alt="SD module diagram" src="./sd card.png" width="50%">
 
+### Adding a MIDI marker button
+
+In order to make it easier to find particularly "worth revisiting" parts of what got recorded, we add a button that connects to pin 4, that we can use to write MIDI markers into our file. There is barely anything to this circuit:
+
+<img alt="simple button diagram" src="./button.png" width="50%">
+
 
 ### Adding a beep, for debugging
 
-Also, we're going to add a little piezo speaker and a button that we can press to turn on (or off) playing a note corresponding to a MIDI note getting played, mostly as the audio equivalent of visual debugging. There's barely any work here: we hook up the "speaker" between pin 8 and ground, and the button to pin 2. Beep, beep!
+And finally, we're going to add a little piezo speaker and a button that we can press to turn on (or off) playing a note corresponding to a MIDI note getting played, mostly as the audio equivalent of visual debugging. There's barely any work here: we hook up the "speaker" between pin 8 and ground, and the button to pin 2. Beep, beep!
 
-<img alt="beep beep button diagram" src="./button.png" width="50%">
+<img alt="beep beep button diagram" src="./beep.png" width="50%">
 
-### Adding a MIDI marker button
 
-We're also going to add a second button, which we'll connect to pin 4. However, rather than using it to generate beeps, we'll use it to generate MIDI markers in our file, so that it's easier to find particularly "worth revisiting" parts of what it recorded.
 
 ## The Software
 
