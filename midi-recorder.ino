@@ -29,29 +29,30 @@
 #include <MIDI.h>
 
 #define AUDIO_DEBUG_PIN 2
+int lastPlayState = 0;
+bool play = false;
+
+#define PLACE_MARKER_PIN 4
+int lastMarkState = 0;
+int nextMarker = 1;
+
 #define AUDIO 8
 #define CHIP_SELECT 9
 #define HAS_MORE_BYTES 0x80
 
-#define NOTE_OFF_EVENT 0x81
-#define NOTE_ON_EVENT 0x91
-#define CONTROL_CHANGE_EVENT 0xB1
-#define PITCH_BEND_EVENT 0xE1
+#define NOTE_OFF_EVENT 0x80
+#define NOTE_ON_EVENT 0x90
+#define CONTROL_CHANGE_EVENT 0xB0
+#define PITCH_BEND_EVENT 0xE0
 
-#define RECORDING_TIMEOUT 120000000
-// 2 minutes, counted in microseconds
-
-int lastPlayState = 0;
-bool play;
-
-String filename;
-File file;
+#define RECORDING_TIMEOUT 120000000 // 2 minute timeout
+unsigned long lastLoopCounter = 0;
+unsigned long loopCounter = 0;
 
 unsigned long startTime = 0;
 unsigned long lastTime = 0;
-
-unsigned long lastLoopCounter = 0;
-unsigned long loopCounter = 0;
+String filename;
+File file;
 
 MIDI_CREATE_DEFAULT_INSTANCE();
 
@@ -67,16 +68,16 @@ void setup() {
 
   // set up the tone playing button
   pinMode(AUDIO_DEBUG_PIN, INPUT);
-  play = false;
+
+  // set up the MIDI marker button
+  pinMode(PLACE_MARKER_PIN, INPUT);
 
   // set up SD card functionality
   pinMode(CHIP_SELECT, OUTPUT);
 
   if (SD.begin(CHIP_SELECT)) {
     findNextFilename();
-    if (file) {
-      createMidiFile();
-    }
+    if (file) createMidiFile();
   }
 }
 
@@ -134,6 +135,7 @@ void createMidiFile() {
 void loop() {
   updateFile();
   setPlayState();
+  checkForMarker();
   MIDI.read();
 }
 
@@ -195,6 +197,48 @@ void setPlayState() {
   }
 }
 
+/**
+   This checks whether the MIDI marker button got
+   pressed, and if so, writes a MIDI marker message
+   into the track.
+*/
+void checkForMarker() {
+  int markState = digitalRead(PLACE_MARKER_PIN);
+  if (markState  != lastMarkState) {
+    lastMarkState = markState;
+    if (markState == 1) {
+      writeMidiMarker();
+    }
+  }
+}
+
+/**
+  Write a MIDI marker message:
+  op code: FF 06
+  arg: (varbyte) number of bytes in the marker label
+  arg: (byte[]) ascii marker label
+*/
+void writeMidiMarker() {
+  if (!file) return;
+
+  // delta + op code
+  writeVarLen(file, getDelta());
+  file.write(0xFF);
+  file.write(0x06);
+
+  // how many bytes are we writing?
+  byte len = 1;
+  if (nextMarker > 9) len++;
+  if (nextMarker > 99) len++;
+  if (nextMarker > 999) len++;
+  file.write(len);
+
+  // our label:
+  byte marker[len];
+  String(nextMarker++).getBytes(marker, len);
+  file.write(marker, len);
+}
+
 
 // ======================================================================================
 
@@ -212,7 +256,7 @@ void handleControlChange(byte channel, byte cc, byte value) {
   writeToFile(CONTROL_CHANGE_EVENT, cc, value, getDelta());
 }
 
-void handlePitchBend(byte channel, int bend) {  
+void handlePitchBend(byte channel, int bend) {
   bend += 0x2000; // MIDI bend is 0x0000-0x3FFF with 0x2000 as center.
   byte lsb = bend & 0x7F;
   byte msb = bend >> 7;
@@ -284,4 +328,3 @@ void writeVarLen(File file, unsigned long value) {
      THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
  ********************************************************/
- 
