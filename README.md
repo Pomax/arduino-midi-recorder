@@ -607,18 +607,9 @@ Importing markers is not possible.
 
 ### FL Studio 20 (Image-Line)
 
-FL Studio is very behind the curve when it comes to importing MIDI data, so if you're an FL Studio user:
+Drag the `.mid` file onto the application background (_not_ the channel rack, and _not_ into a pattern). Uncheck "start new project" in the import dialog, then hit OK. You can then assign this a "real" instrument by dragging any VST/FL instrument onto its channel rack entry.
 
-1. Importing note data is easy.
-1. Importing automation is complicated.
-1. Importing pitch bend is impossible.
-1. Importing MIDI markers is impossible.
-
-I don't know why Image-Line decided not to make this as easy as the competition, but whatever the reasons were: those have long since stopped making sense.
-
-Drag the `.mid` file onto a pattern's `Piano roll` (_not_ into the pattern window as you might expect). This will prompt you for which channels should be imported: import everything, and you'll have imported the note data.
-
-To import CC automation, [please see the official documentation here](https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/automation_midiimport.htm).
+Importing markers is not  impossible.
 
 
 ## Comments and/or questions
