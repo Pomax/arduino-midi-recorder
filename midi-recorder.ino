@@ -45,14 +45,15 @@ int nextMarker = 1;
 #define CONTROL_CHANGE_EVENT 0xB0
 #define PITCH_BEND_EVENT 0xE0
 
-#define RECORDING_TIMEOUT 120000000 // 2 minute timeout
+// we use a 2 minute idling timeout (in millis)
+#define RECORDING_TIMEOUT 120000
 unsigned long lastLoopCounter = 0;
 unsigned long loopCounter = 0;
 
 unsigned long startTime = 0;
 unsigned long lastTime = 0;
 
-#define FILE_FLUSH_INTERVAL 400;
+#define FILE_FLUSH_INTERVAL 400
 String filename;
 File file;
 
@@ -135,9 +136,9 @@ void createMidiFile() {
    and then handling MIDI input, if there is any.
 */
 void loop() {
-  updateFile();
-  setPlayState();
   checkForMarker();
+  setPlayState();
+  updateFile();
   MIDI.read();
 }
 
@@ -177,7 +178,7 @@ void(* resetArduino) (void) = 0;
 void checkReset() {
   if (startTime == 0) return;
   if (!file) return;
-  if (micros() - lastTime > RECORDING_TIMEOUT) {
+  if (millis() - lastTime > RECORDING_TIMEOUT) {
     file.close();
     resetArduino();
   }
