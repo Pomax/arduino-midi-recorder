@@ -607,9 +607,9 @@ Importing markers is not possible.
 
 ### FL Studio 20 (Image-Line)
 
-Drag the `.mid` file onto the application background (_not_ the channel rack, and _not_ into a pattern). Uncheck "start new project" in the import dialog, then hit OK. You can then assign this a "real" instrument by dragging any VST/FL instrument onto its channel rack entry.
+Drag the `.mid` file onto the application background (_not_ the channel rack, and _not_ into a pattern). When prompted to save changes, say "no", then uncheck "start new project" in the MIDI import dialog, then hit "accept". This will create a new channel rack entry and placable pattern that you can assign a "real" instrument by dragging any VST/FL instrument onto the channel rack's import default to replace it.
 
-Importing markers is not  impossible.
+Importing markers is not possible.
 
 
 ## Comments and/or questions
