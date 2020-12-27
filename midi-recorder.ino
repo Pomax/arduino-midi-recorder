@@ -1,6 +1,6 @@
 /*********************************************************
 
-   This is the code for a prototype MIDI field recorder
+   This is the code for a prototype inline MIDI recorder
    that sits between a MIDI-OUT device (like a controller)
    and a MIDI-IN device (like a computer) for saving all
    note, pitch, and CC data that's being played without
@@ -51,13 +51,15 @@ unsigned long loopCounter = 0;
 
 unsigned long startTime = 0;
 unsigned long lastTime = 0;
+
+#define FILE_FLUSH_INTERVAL 400;
 String filename;
 File file;
 
 MIDI_CREATE_DEFAULT_INSTANCE();
 
 /**
-   Set up our MIDI field recorder
+   Set up our inline MIDI recorder
 */
 void setup() {
   MIDI.begin(MIDI_CHANNEL_OMNI);
@@ -72,9 +74,8 @@ void setup() {
   // set up the MIDI marker button
   pinMode(PLACE_MARKER_PIN, INPUT);
 
-  // set up SD card functionality
+  // set up SD card functionality and allocate a file
   pinMode(CHIP_SELECT, OUTPUT);
-
   if (SD.begin(CHIP_SELECT)) {
     findNextFilename();
     if (file) createMidiFile();
@@ -102,7 +103,7 @@ void findNextFilename() {
 }
 
 /**
-   Set up a new MIDI file with some boilter plate byte code
+   Set up a new MIDI file with some boiler plate byte code
 */
 void createMidiFile() {
   byte header[] = {
@@ -129,8 +130,9 @@ void createMidiFile() {
 }
 
 /**
-   The program loop consists of checking whether we need to perform
-   any file management, and then checking for MIDI input.
+   The program loop consists of flushing our file to disk,
+   checking our buttons to see if they just got pressed,
+   and then handling MIDI input, if there is any.
 */
 void loop() {
   updateFile();
@@ -144,17 +146,14 @@ void loop() {
 
 
 /**
-   We close-and-reopen our file every 400ms, allowing
-   us to treat the file as an always-open byte stream,
-   while ensuring the file stays up to date on the SD
-   card rather than being a 0 byte file because it
-   never gets closed, or having to open and close it
-   for every single write operation (which would be
-   rather terrible, performance wise).
+   We flush the file's in-memory content to disk
+   every 400ms, allowing. That way if we take the
+   SD card out, it's basically impossible for any
+   data to have been lost.
 */
 void updateFile() {
   loopCounter = millis();
-  if (loopCounter - lastLoopCounter > 400) {
+  if (loopCounter - lastLoopCounter > FILE_FLUSH_INTERVAL) {
     checkReset();
     lastLoopCounter = loopCounter;
     file.flush();
@@ -162,32 +161,32 @@ void updateFile() {
 }
 
 /**
-   This will crash the arduino when called as a function,
-   so the watchdog will catch that and restart, instead =)
+   This "function" would normally crash any kernel that tries
+   to run it by violating memory access. Instead, the Arduino's
+   watchdog will auto-reboot, giving us a software "reset".
 */
 void(* resetArduino) (void) = 0;
 
 /**
-  if we've not received any data for 2 minutes,
-  delete the current file if it's empty, and reset
-  the arduino, so that we're on a new file.
+  if we've not received any data for 2 minutes, and we were
+  previously recording, we reset the arduino so that when
+  we start playing again, we'll be doing so in a new file,
+  rather than having multiple sessions with huge silence 
+  between them in the same file.
 */
 void checkReset() {
+  if (startTime == 0) return;
   if (!file) return;
   if (micros() - lastTime > RECORDING_TIMEOUT) {
-    if (startTime == 0) {
-      file.close();
-      SD.remove(filename);
-    }
+    file.close();
     resetArduino();
   }
 }
 
 /**
-   This mostly exists for debuggin purposes: pressing
-   the button tied to the audio debug pin will cause
-   the program to play notes for every MIDI note-on
-   event that comes flying by.
+   A little audio-debugging: pressing the button tied to the
+   audio debug pin will cause the program to play notes for
+   every MIDI note-on event that comes flying by.
 */
 void setPlayState() {
   int playState = digitalRead(AUDIO_DEBUG_PIN);
@@ -198,9 +197,8 @@ void setPlayState() {
 }
 
 /**
-   This checks whether the MIDI marker button got
-   pressed, and if so, writes a MIDI marker message
-   into the track.
+   This checks whether the MIDI marker button got pressed,
+   and if so, writes a MIDI marker message into the track.
 */
 void checkForMarker() {
   int markState = digitalRead(PLACE_MARKER_PIN);
@@ -213,20 +211,22 @@ void checkForMarker() {
 }
 
 /**
-  Write a MIDI marker message:
-  op code: FF 06
-  arg: (varbyte) number of bytes in the marker label
-  arg: (byte[]) ascii marker label
+  Write a MIDI marker to file, by writing a delta, then
+  the op code for "midi marker", the number of letters
+  the marker label has, and then the label (using ASCII).
+
+  For simplicity, the marker labels will just be a
+  sequence number starting at "1".
 */
 void writeMidiMarker() {
   if (!file) return;
 
-  // delta + op code
+  // delta + event code
   writeVarLen(file, getDelta());
   file.write(0xFF);
   file.write(0x06);
 
-  // how many bytes are we writing?
+  // how many letters are we writing?
   byte len = 1;
   if (nextMarker > 9) len++;
   if (nextMarker > 99) len++;
@@ -257,7 +257,7 @@ void handleControlChange(byte channel, byte cc, byte value) {
 }
 
 void handlePitchBend(byte channel, int bend) {
-  bend += 0x2000; // MIDI bend is 0x0000-0x3FFF with 0x2000 as center.
+  bend += 0x2000; // MIDI bend uses the range 0x0000-0x3FFF, with 0x2000 as center.
   byte lsb = bend & 0x7F;
   byte msb = bend >> 7;
   writeToFile(PITCH_BEND_EVENT, lsb, msb, getDelta());
@@ -268,6 +268,8 @@ void handlePitchBend(byte channel, int bend) {
 */
 int getDelta() {
   if (startTime == 0) {
+    // if this is the first event, even if the Arduino's been
+    // powered on for hours, this should be delta zero.
     startTime = millis();
     lastTime = startTime;
     return 0;
@@ -279,10 +281,10 @@ int getDelta() {
 }
 
 /**
-   Write MIDI events to file, where all MIDI events are
-   recording uses the format:
+   Write "common" MIDI events to file, where common MIDI events
+   all use the following data format:
 
-   <tick delta> <event code> <byte> <byte>
+     <delta> <event code> <byte> <byte>
 
    See the "Standard MIDI-File Format" for more information.
 */
@@ -295,19 +297,23 @@ void writeToFile(byte eventType, byte b1, byte b2, int delta) {
 }
 
 /**
-   Ported from the MIDI spec:
+   Encode a unsigned 32 bit integer as variable-length byte sequence
+   of, at most, 4 7-bit-with-has-more bytes. This function is supplied
+   as part of the MIDI file format specification.
 */
 void writeVarLen(File file, unsigned long value) {
+  // capture the first 7 bit block
   unsigned long buffer = value & 0x7f;
 
-  // esnure MSBF ordering
+  // shift in 7 bit blocks with "has-more" bit from the
+  // right for as long as `value` has more bits to encode.
   while ((value >>= 7) > 0) {
     buffer <<= 8;
     buffer |= HAS_MORE_BYTES;
     buffer |= value & 0x7f;
   }
 
-  // write out values (LIFO)
+  // Then unshift bytes one at a time for as long as the has-more bit is high.
   while (true) {
     file.write((byte)(buffer & 0xff));
     if (buffer & HAS_MORE_BYTES) {
