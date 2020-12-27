@@ -135,19 +135,24 @@ void setup() {
 }
 
 void loop() {
+  checkForMarker();
+  setPlayState();
+  updateFile();
   MIDI.read();
 }
 ```
 
 This sets up MIDI listening on all MIDI channels (there are sixteen of them, and we don't want to guess which channels are active), and reads out the MIDI data from `RX<-0` - you may have noticed we don't explicitly set a baud rate: the MIDI spec only allows for 31,250 bits per second, so the Arduino MIDI library automatically makes sure to set the correct polling rate for us.
 
-That leaves implementing our MIDI event handling:
+You'll notice that `loop()` does four things: we'll only be looking at the MIDI reading in this section, with the next sections covering the other three steps.
+
+For now, assuming that the first three function calls work (because they will, later =), that leaves implementing our MIDI event handling:
 
 ```c++
-#define NOTE_OFF_EVENT 0x81
-#define NOTE_ON_EVENT 0x91
-#define CONTROL_CHANGE_EVENT 0xB1
-#define PITCH_BEND_EVENT 0xE1
+#define NOTE_OFF_EVENT 0x80
+#define NOTE_ON_EVENT 0x90
+#define CONTROL_CHANGE_EVENT 0xB0
+#define PITCH_BEND_EVENT 0xE0
 
 void handleNoteOff(byte channel, byte pitch, byte velocity) {
   writeToFile(NOTE_OFF_EVENT, pitch, velocity);
@@ -162,25 +167,28 @@ void handleControlChange(byte channel, byte controller, byte value) {
 }
 
 void handlePitchBend(byte channel, int bend_value) {
-  // First off, we need to "recenter" the bend value,
+  // First off, we need to "re-center" the bend value,
   // because in MIDI, the bend value is a positive value
   // in the range 0x0000-0x3FFF with 0x2000 considered
-  // the "neutral" mid point:
+  // the "neutral" mid point, whereas the MIDI library
+  // gives us a signed integer value that uses 0 as its
+  // midpoint and negative numbers to signify "down".
   bend_value += 0x2000;
 
-  // Then, per the MIDI spec, bend_value is 14 bits, and
-  // needs to be encoded as two 7-bit bytes, encoded as
-  // the lowest 7 bits in the first byte, and the highest
-  // 7 bits in the second byte:
+  // Then, per the MIDI spec, we need to encode the 14 bit
+  // bend value as two 7-bit bytes, where the first byte 
+  // contains the lowest 7 bits of our bend value, and second
+  // byte contains the highest 7 bits of our bend value:
   byte lowBits = (byte) (bend_value & 0x7F);
   byte highBits = (byte) ((bend_value >> 7) & 0x7F);
 
   writeToFile(PITCH_BEND_EVENT, lowBits, highBits);
 }
 ```
-(note that we're ignoring the `channel` byte: we'll be creating a "simple" format 0 MIDI file, and for maximum usability in terms of importing our data in a DAW, we're putting all the events on channel 2)
 
-This is a good start, but MIDI events are just that: events, and events happen "at some specific time" which we're still going to have to capture. MIDI events don't rely on absolute time based on some kind of real time clock (which is good for us, because Arduino doesn't have an RTC built in!) and instead relies on counting a "time delta": it marks events with the number of "MIDI clock ticks" since the previous event, with the very first event in the event stream having an explicit time delta of zero.
+(note that we're ignoring the `channel` byte: we'll be creating a "simple" format 0 MIDI file, and for maximum usability in terms of importing our data in a DAW, we're putting all the events on channel 1. We can see this in our event constants: events use two 4 bit "nibbles" with the first nibble being the event identifier, and the second nibble being the channel that the event happens in, so for example: `NOTE_OFF_EVENT` uses 0x80 for "note off on channel 1", but 0x8F for "note off on channel 16")
+
+This is a good start, but MIDI events are just that: events, and events happen "at some specific time" which we're still going to have to capture. Standard MIDI events don't rely on absolute values from some real time clock (which is good for us, because Arduinos don't have an RTC built in!) and instead rely on counting a "time delta": it marks events with the number of "MIDI clock ticks" since the previous event, with the very first event in the event stream having an explicit time delta of zero.
 
 So: let's write a `getDelta()` function that we can use to get the number of MIDI ticks since the last event (=since the last time `getDelta()` got called) so that we have all the data we need ready to start writing MIDI to file:
 
@@ -227,7 +235,7 @@ void handlePitchBend(byte channel, int bend_value) {
 }
 ```
 
-Which means we can move on to actually writing MIDI data to a `.mid` file!
+That leaves the last step: writing our data to file, for which we'll need to first look at setting up a file and getting it ready for accepting MIDI events. On to the file management!
 
 
 ### File management
@@ -241,6 +249,8 @@ String filename;
 File file;
 
 void setup() {
+  // ...previous code...
+   
   pinMode(CHIP_SELECT, OUTPUT);
 
   if (SD.begin(CHIP_SELECT)) {
@@ -324,14 +334,18 @@ That's... that's not a lot of code. And the reason it's not a lot of code is tha
 #define HAS_MORE_BYTES 0x80
 
 void writeVarLen(unsigned long value) {
+  // Start with the first 7 bit block
   unsigned long buffer = value & 0x7f;
 
+  // Then shift in 7 bit blocks with "has-more" bit from the
+  // right for as long as `value` has more bits to encode.  
   while ((value >>= 7) > 0) {
     buffer <<= 8;
     buffer |= HAS_MORE_BYTES;
     buffer |= value & 0x7f;
   }
 
+  // Then unshift bytes one at a time for as long as the has-more bit is high.
   while (true) {
     file.write((byte)(buffer & 0xff));
     if (buffer & HAS_MORE_BYTES) {
@@ -359,17 +373,15 @@ int lastMarkState = 0;
 int nextMarker = 1;
 
 void setup() {
+  // ...previous code...
+  
   pinMode(PLACE_MARKER_PIN, INPUT);
 }
 ```
 
-And then let's make sure we can add MIDI marker file-writing whenever someone presses the button:
+With that, we can implement the `checkForMarkers()` function that we saw in our `loop()` earlier, so that we can add MIDI marker file-writing whenever we press the "set a marker" button:
 
 ```c++
-void loop() {
-  checkForMarker();
-}
-
 void checkForMarker() {
   int markState = digitalRead(PLACE_MARKER_PIN);
   if (markState  != lastMarkState) {
@@ -383,27 +395,28 @@ void checkForMarker() {
 
 The only special thing that's going on here is that when we press our button, we want that the program to know that it should write a MIDI marker to our SD card, so during the program loop we check to see if there's a "high" signal coming from our button. If there is, then we're pressing it, and we check whether we were previously _not_ pressing it so that we only do something "when the button gets pressed" rather than "for as long as the button is kept pressed". (If we didn't check whether the previous state was low, we'd end up writing MIDI markers to our SD card 32,150 times a second. Which would be bad!)
 
-That leaves implementing the `writeMidiMarker()` function, which needs to write a MIDI event like any other, using a time delta, the code `FF 06` to indicate this will be a MIDI marker, and a label (in ASCII) + "how many bytes in the label" value (although for parsing reasons, those last two are ordered as length first, then string data).
+That leaves implementing the actual `writeMidiMarker()` function, which needs to write a MIDI event like any other, using a time delta, the code `FF 06` to indicate this will be a MIDI marker, and a label (in ASCII) + "how many bytes in the label" value (although for parsing reasons, those last two are ordered as length first, then string data).
 
-We're not going to get fancy with our labels: plain numbers will do, with our first marker having label `1`, the next having label `2`, etc. That sounds simple enough, but we do need to save those as _text_, not as numbers, so we'll need to be careful with the length: `1` has length 1, but `12` has length 2 because it's two characters long:
+We're not going to get fancy with our labels: plain sequential numbers will do, with our first marker having label `"1"`, the next having label `"2"`, etc. That sounds simple enough, but we do need to make sure we save those numbers _as text_ and not as numbers, so we'll need to be careful with the length value that is part of the event payload: while the text `"1"` has length 1, the text `"10"` has length 2 because it's two characters long. So let's get coding:
 
 ```c++
 void writeMidiMarker() {
   if (!file) return;
 
-  // delta + op code
+  // Delta + event code
   writeVarLen(file, getDelta());
   file.write(0xFF);
   file.write(0x06);
 
-  // how many bytes are we writing?
+  // How many bytes are we writing?
   byte len = 1;
-  if (nextMarker > 9) len++;
-  if (nextMarker > 99) len++;
-  if (nextMarker > 999) len++; // though at this point, I don't think this is the right hardware for you...
+  if (nextMarker > 9) len++;   // Allowing for more than 9 markers is fair.
+  if (nextMarker > 99) len++;  // ... but this would be a lot of markers.
+  if (nextMarker > 999) len++; // ... and at this point, I don't think this is the right hardware for you! O_O
   writeVarLen(file, len);
 
-  // our label:
+  // Then we convert our sequence number to a string,
+  // and write that to file as a byte sequence:
   byte marker[len];
   String(nextMarker++).getBytes(marker, len);
   file.write(marker, len);
@@ -424,11 +437,9 @@ int lastPlayState = 0;
 bool play = false;
 
 void setup() {
-  pinMode(AUDIO_DEBUG_PIN, INPUT);
-}
+  // ...previous code...
 
-void loop() {
-  setPlayState();
+  pinMode(AUDIO_DEBUG_PIN, INPUT);
 }
 
 void setPlayState() {
@@ -478,19 +489,15 @@ To that end, what we would like is for our program to detect that you've _not_ b
 As it so happens, the first part is _constantly_ true, because we're only writing to our file when new data comes in, and we've _also_ already implemented the second part: that happens automatically when you turn on the Arduino, so the only thing we're missing is a way to detect whether there's not been any input for a while:
 
 ```c++
-#define RECORDING_TIMEOUT 120000000
-// 2 minutes, counted in microseconds
-
+// we use a 2 minute idling timeout, expressed in milliseconds
+#define RECORDING_TIMEOUT 120000
+#define FILE_FLUSH_INTERVAL 400
 unsigned long lastLoopCounter = 0;
 unsigned long loopCounter = 0;
 
-void loop() {
-  updateFile();
-}
-
 void updateFile() {
   loopCounter = millis();
-  if (loopCounter - lastLoopCounter > 400) {
+  if (loopCounter - lastLoopCounter > FILE_FLUSH_INTERVAL) {
     checkReset();
     lastLoopCounter = loopCounter;
     file.flush();
@@ -498,10 +505,10 @@ void updateFile() {
 }
 
 void checkReset() {
+  if (startTime == 0) return;
   if (!file) return;
-  if (micros() - lastTime > RECORDING_TIMEOUT) {
+  if (millis() - lastTime > RECORDING_TIMEOUT) {
     file.close();
-    if (startTime == 0) SD.remove(filename);
     resetArduino();
   }
 }
@@ -511,11 +518,11 @@ void(* resetArduino) (void) = 0;
 
 That might do more than you thought, so let's look at what's happening.
 
-First, we want to check whether any MIDI activity has happened during the program loop, but we _don't_ want to check that 32,150 times each second. So, instead, we set up some standard code to check every 400 milliseconds, where we check whether the difference between the `lastTime` (which is the microsecond timestamp for the last MIDI event) and the current `micros()` value is more than 2 minutes, counted in microseconds. If it is, then we're just idling and we can restart the Arduino to start a new file. However, we don't want to create a million (or, hundreds, since we only allow 999 files in this program) files that are all 29 bytes long because they contain the boilerplate MIDI code but nothing else, so if the Arduino has been idling _without_ any MIDI event having been seen yet, we delete the currently open file first, so that when the Arduino restarts, it will create "the same file" and it'll be as if we've hit rewind on the current file, rather than having restarted.
+First, we want to check whether any MIDI activity has happened during the program loop, but we _don't_ want to check that 32,150 times each second. So, instead, we set up some standard code to check every 400 milliseconds, where we check whether the difference between the `lastTime` (which is the millisecond timestamp for the last MIDI event) and the current `millis()` value is more than 2 minutes, counted in milliseconds. If it is, and we've already been recording MIDI events, then we're just idling and we can restart the Arduino so that we're "working" in a new file rather than writing multiple sessions to the same file with huge silences in between. Of course, if we've not recorded any MIDI events yet, we just do nothing: the first event we'll write "starts the clock", so we never have any "leading silence" in our MIDI file =)
 
-Also note that we're closing our file before we reset: as long as our file handle is open, the actual on-disk state is _unknown_ and it's entirely possible for our SD card to show a 0 byte file, so we want to explicitly close the file handle before we reset. This is also why you're seeing that `file.flush()`, which runs (without closing the file) if we're not resetting: we want to make sure that the on-disk file is kept reasonably in sync with the data we've been recording, keeping the SD controller's file buffer nice and small.
+Also note that we're closing our file before we reset: while we're already flushing any in-memory file data to disk every 400 milliseconds, it's always good form to close a file handle when you can.
 
-Finally, there's the `resetArduino()` "function". This doesn't look like any function you've seen, and is really not so much a normal function as an exploit of the Arduino chipset's watchdog: we're intentionally doing something illegal, which causes the Arduino to reset! There are a million ways to make C++ code do something illegal, but in this case we're defining a function pointer that tries to execute whatever's in memory address 0. That's _incredibly wrong_ and so when we execute that call, the Arduino goes "WHAT? NO!" and reboots. It's delightfully effective.
+Finally, there's the `resetArduino()` "function". This doesn't look like any function you've seen, and is really not so much a normal function as "an exploit of the Arduino chipset's watchdog": we're intentionally doing something illegal, which would normally cause a crash. However, rather than crashing, the Arduino has a watchdog that restarts the Arduino when it sees a crash, so your board is always either in a working state, or coming online. There are a million ways to make C++ code do something illegal, but in this case we're defining a function pointer that tries to execute whatever's in memory address 0. That's _incredibly wrong_ and so when we execute that call, the Arduino goes "Whoa, wait, what? ERK!" and then restarts. It's delightfully effective.
 
 
 ### A final helper script
@@ -558,7 +565,7 @@ for filename in midi_files:
     print(f"Updated {filename} track length to {track_length}")
 ```
 
-Now, every time we want to load our `.mid` files from SD card into a DAW or other MIDI-compatible program, we can just run this file first, and irrespective of whether our `.mid` files had valid track length values or not, they will be guaranteed to have correct values once the script finishes.
+With this, every time we want to load our `.mid` files from SD card into a DAW or other MIDI-compatible program, we can just run this script first, and irrespective of whether our `.mid` files had valid track length values or not they will be guaranteed to have correct values once the script finishes.
 
 (You can also directly download this script [here](https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/fix.py))
 
