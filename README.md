@@ -32,7 +32,7 @@ So: if you want a MIDI recorder, you'll have to build one... and if you want to 
 
 ## The circuitry
 
-<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/banner.jpg" target="_blank"><img src="banner.jpg" width="100%"></a>
+<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/banner.jpg" target="_blank"><img src="banner-small.jpg" width="100%"></a>
 
 To build this, we're going to basically build a standard "MIDI-In + MIDI-Thru" circuit using an Arduino, with an SD card module hooked up so we can save the data that comes flying by. To build everything, we'll need some special components:
 
@@ -176,7 +176,7 @@ void handlePitchBend(byte channel, int bend_value) {
   bend_value += 0x2000;
 
   // Then, per the MIDI spec, we need to encode the 14 bit
-  // bend value as two 7-bit bytes, where the first byte 
+  // bend value as two 7-bit bytes, where the first byte
   // contains the lowest 7 bits of our bend value, and second
   // byte contains the highest 7 bits of our bend value:
   byte lowBits = (byte) (bend_value & 0x7F);
@@ -250,7 +250,7 @@ File file;
 
 void setup() {
   // ...previous code...
-   
+
   pinMode(CHIP_SELECT, OUTPUT);
 
   if (SD.begin(CHIP_SELECT)) {
@@ -338,7 +338,7 @@ void writeVarLen(unsigned long value) {
   unsigned long buffer = value & 0x7f;
 
   // Then shift in 7 bit blocks with "has-more" bit from the
-  // right for as long as `value` has more bits to encode.  
+  // right for as long as `value` has more bits to encode.
   while ((value >>= 7) > 0) {
     buffer <<= 8;
     buffer |= HAS_MORE_BYTES;
@@ -374,7 +374,7 @@ int nextMarker = 1;
 
 void setup() {
   // ...previous code...
-  
+
   pinMode(PLACE_MARKER_PIN, INPUT);
 }
 ```
