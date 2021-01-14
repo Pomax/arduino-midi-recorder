@@ -65,20 +65,20 @@ The SD card circuitry is literally just a matter of "connect the pins to the pin
 
 However, note that your SD card module **may have a different pin layout** so be sure to double-check before wiring things up!
 
-<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/sd card.jpg" target="_blank"><img alt="SD module diagram" src="./sd card.png" width="50%"></a>
+<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/sd card.png" target="_blank"><img alt="SD module diagram" src="./sd card.png" width="50%"></a>
 
 ### Adding a MIDI marker button
 
 In order to make it easier to find particularly "worth revisiting" parts of what got recorded, we add a button that connects to pin 4, that we can use to write MIDI markers into our file. There is barely anything to this circuit:
 
-<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/button.jpg" target="_blank"><img alt="simple button diagram" src="./button.png" width="50%"></a>
+<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/button.png" target="_blank"><img alt="simple button diagram" src="./button.png" width="50%"></a>
 
 
 ### Adding a beep, for debugging
 
 And finally, we're going to add a little piezo speaker and a button that we can press to turn on (or off) playing a note corresponding to a MIDI note getting played, mostly as the audio equivalent of visual debugging. There's barely any work here: we hook up the "speaker" between pin 8 and ground, and the button to pin 2. Beep, beep!
 
-<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/beep.jpg" target="_blank"><img alt="beep beep button diagram" src="./beep.png" width="50%"></a>
+<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/beep.png" target="_blank"><img alt="beep beep button diagram" src="./beep.png" width="50%"></a>
 
 
 
