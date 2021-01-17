@@ -54,7 +54,7 @@ And of course, the bits that you'll get with pretty much any Arduino starter kit
 
 We set up MIDI-In on the Arduino `RX<-0` pin, with MIDI-Thru tapping straight into signal that's getting sent to `RX<-0`, too. The only tricky bit about this is that MIDI signals are isolated from the rest of the circuitry via an optocoupler (which gets around ground loop problems by literally transmitting signals by running them through a LED, which emits the electrical signal as light, which then gets picked up by a phototransistor that turns the light back into an electrical signal). When placing and connecting the optocoupler, it is very important to make sure you know which pin is pin 1: it'll have a little mark next to it (typically a dot on the chip casing) to tell you that that side has pins 1 through 4 running top to bottom, and pins 5 through 8 on the other side _running bottom to top_. Also note that we're not using pins 1 and 4 for this circuit: only pins 2 and 3 are connected to the MIDI-In connector, and pins 5 through 8 are connected to the various arduino pins.
 
-<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/MIDI.jpg" target="_blank"><img alt="MIDI circuit diagram" src="./MIDI.png" width="75%"></a>
+<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/MIDI.png" target="_blank"><img alt="MIDI circuit diagram" src="./MIDI.png" width="75%"></a>
 
 (I know, "Thru isn't a word!", but that's what [the MIDI spec](http://www.shclemen.com/download/The%20Complete%20MIDI1.0%20Detailed%20Spec.pdf#page=7&zoom=auto,-206,478) calls it, so English gets to take a back seat here...)
 
@@ -65,20 +65,20 @@ The SD card circuitry is literally just a matter of "connect the pins to the pin
 
 However, note that your SD card module **may have a different pin layout** so be sure to double-check before wiring things up!
 
-<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/sd card.jpg" target="_blank"><img alt="SD module diagram" src="./sd card.png" width="50%"></a>
+<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/sd card.png" target="_blank"><img alt="SD module diagram" src="./sd card.png" width="50%"></a>
 
 ### Adding a MIDI marker button
 
 In order to make it easier to find particularly "worth revisiting" parts of what got recorded, we add a button that connects to pin 4, that we can use to write MIDI markers into our file. There is barely anything to this circuit:
 
-<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/button.jpg" target="_blank"><img alt="simple button diagram" src="./button.png" width="50%"></a>
+<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/button.png" target="_blank"><img alt="simple button diagram" src="./button.png" width="50%"></a>
 
 
 ### Adding a beep, for debugging
 
 And finally, we're going to add a little piezo speaker and a button that we can press to turn on (or off) playing a note corresponding to a MIDI note getting played, mostly as the audio equivalent of visual debugging. There's barely any work here: we hook up the "speaker" between pin 8 and ground, and the button to pin 2. Beep, beep!
 
-<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/beep.jpg" target="_blank"><img alt="beep beep button diagram" src="./beep.png" width="50%"></a>
+<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/beep.png" target="_blank"><img alt="beep beep button diagram" src="./beep.png" width="50%"></a>
 
 
 
