@@ -43,8 +43,9 @@ To build this, we're going to basically build a standard "MIDI-In + MIDI-Thru" c
 And of course, the bits that you'll get with pretty much any Arduino starter kit:
 
 1. An Arduino UNO R3 or equivalent board
-1. 4x 220 ohm resistors
+1. 2x 220 ohm resistors
 1. 1x 4.7k ohm resistor
+1. 2x 10k ohm resistors
 1. A diode
 1. A piezo buzzer
 1. Two clicky pushy buttons
