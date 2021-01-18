@@ -601,7 +601,7 @@ Drag the `.mid` file onto a track.
 
 To view your automation data, select and double-click the track to open its piano roll, and use the events buttons below the piano roll/above the events pane.
 
-Importing markers is _technically_ possible, but it might as well not be: see https://www.youtube.com/watch?v=Se1Anm1-yaw for how needlessly complicated this is.
+Importing markers is _technically_ possible, but it might as well not be: see [https://www.youtube.com/watch?v=Se1Anm1-yaw](https://www.youtube.com/watch?v=Se1Anm1-yaw) for how needlessly complicated this is.
 
 
 ### Ableton Live 10
