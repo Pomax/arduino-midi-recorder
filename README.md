@@ -508,7 +508,7 @@ RTC_DS3231 RTC;
 bool HAS_RTC = false;
 ```
 
-And then in `setup` we can both initialise the RTC interface, as well as well the SD module that there's now an RTC that it can ask for date/time information when it needs it.
+And then in `setup` we can both initialise the RTC interface, as well as let the SD module know that there's now an RTC that it can ask for date/time information when it needs it:
 
 ```C++
 void setup() {
