@@ -18,6 +18,7 @@ So: if you want a MIDI recorder, you'll have to build one... and if you want to 
    1. [SD card](#the-sd-part-of-our-recorder)
    1. [MIDI marker button](#adding-a-midi-marker-button)
    1. [All the beep beeps](#adding-a-beep-for-debugging)
+   1. [Options: the real time clock](#bonus-adding-a-real-time-clock)
 1. [The software](#the-software)
    1. [Basics](#program-basics)
    1. [MIDI handling](#midi-handling)
