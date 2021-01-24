@@ -18,7 +18,7 @@ So: if you want a MIDI recorder, you'll have to build one... and if you want to 
    1. [SD card](#the-sd-part-of-our-recorder)
    1. [MIDI marker button](#adding-a-midi-marker-button)
    1. [All the beep beeps](#adding-a-beep-for-debugging)
-   1. [Options: the real time clock](#bonus-adding-a-real-time-clock)
+   1. [Optional: the real time clock](#bonus-adding-a-real-time-clock)
 1. [The software](#the-software)
    1. [Basics](#program-basics)
    1. [MIDI handling](#midi-handling)
@@ -84,7 +84,7 @@ And finally, we're going to add a little piezo speaker and a button that we can 
 <a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/beep.png" target="_blank"><img alt="beep beep button diagram" src="./beep.png" width="50%"></a>
 
 
-### Bonus: adding a Real Time Clock
+### Optional: adding a Real Time Clock
 
 Our last bit of circuitry is not required in the slightest, but it does improve usability quite a bit: a real-time clock using a DS3231 chip, which is a "fancy" RTC with some smart bits that keeps it accurate regardless of temperature changes. Connecting it is pretty straight forward, and uses some pins on the side of the Arduino we've not used yet, connecting the SDA (or "D") pin to the A4 input, and the SCL (or "C") pin to the A5 input. What will this get us? For one we the SD card library can make us of it to make sure files have a real file date, and secondly, it'll allow us to write MIDI markers that are linked to dates and times, rather than being a simple sequence number. Both these things will make it easier to find past work more easily.
 
