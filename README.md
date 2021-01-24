@@ -39,6 +39,7 @@ To build this, we're going to basically build a standard "MIDI-In + MIDI-Thru" c
 1. An Arduino SD card module (~$10 for a pack of five)
 1. Two female 5-pin DIN connectors (~$5 for a pack of ten)
 1. A 6N138 optocoupler (~$10 for a pack of ten)
+1. Optional: a DS3231-based RTC module
 
 And of course, the bits that you'll get with pretty much any Arduino starter kit:
 
@@ -82,6 +83,12 @@ And finally, we're going to add a little piezo speaker and a button that we can 
 <a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/beep.png" target="_blank"><img alt="beep beep button diagram" src="./beep.png" width="50%"></a>
 
 
+### Bonus: adding a Real Time Clock
+
+Our last bit of circuitry is not required in the slightest, but it does improve usability quite a bit: a real-time clock using a DS3231 chip, which is a "fancy" RTC with some smart bits that keeps it accurate regardless of temperature changes. Connecting it is pretty straight forward, and uses some pins on the side of the Arduino we've not used yet, connecting the SDA (or "D") pin to the A4 input, and the SCL (or "C") pin to the A5 input. What will this get us? For one we the SD card library can make us of it to make sure files have a real file date, and secondly, it'll allow us to write MIDI markers that are linked to dates and times, rather than being a simple sequence number. Both these things will make it easier to find past work more easily.
+
+<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/RTC.png" target="_blank"><img alt="DS3231 RTC diagram" src="./RTC.png" width="50%"></a>
+
 
 ## The Software
 
@@ -92,8 +99,9 @@ With the circuitry set up, let's start writing our program, focussing on dealing
 1. [Basic file writing (SD library)](#file-management)
 1. [Saving MIDI markers](#saving-midi-markers)
 1. [Audio debugging (beep beep)](#making-some-beeps)
-1. [Usability bonus: "clean restart" on idle](#creating-a-new-file-when-idling)
-1. [Usability bonus 2: "fix the track length" script](#a-final-helper-script)
+1. [Usability bonus: adding the real-time clock](#adding-the-real-time-clock)
+1. [Usability bonus 2: "clean restart" on idle](#creating-a-new-file-when-idling)
+1. [Final usability bonus: "fix the track length" script](#a-final-helper-script)
 
 
 ### Program basics
@@ -479,6 +487,90 @@ To keep things simple, because we're only writing this code for some debugging (
 So now if we start our program, and we press our button, playing notes on our MIDI device will make the Arduino beep along with what we're playing. Of course, the `tone()` function can only play a single note at a time, so it's going to sound wonky if we play chords, but it'll be beeping as best as it can.
 
 Beep, beep!
+
+
+### Adding the real time clock
+
+We can improve our files and MIDI markers by adding the RTC to the mix, which will do two things for us:
+
+1. give us real datetimes for our files, and
+1. letting us set MIDI markers with the actual time you pressed the marker button
+
+So let's make that happen. First, in order to talk to an RTC we need to include a RTC library. I say "a" because there are quite a few to pick from, but I used the Adafruit library, so let's stick with that:
+
+```c++
+#include <SD.h>
+#include <MIDI.h>
+#include <Wire.h>
+#include <RTClib.h>
+
+RTC_DS3231 RTC;
+bool HAS_RTC = false;
+```
+
+And then in `setup` we can both initialise the RTC interface, as well as well the SD module that there's now an RTC that it can ask for date/time information when it needs it.
+
+```C++
+void setup() {
+  ...
+
+  Wire.begin();
+  if (RTC.begin()) {
+    // This line is special: we only need it once, and after that we're deleting it:
+    RTC.adjust(DateTime(F(__DATE__), F(__TIME__)));
+
+    // if the RTC works, we can tell the SD library
+    // how it can check for the current time when it
+    // needs timestamping for file creation/writing.
+    SdFile::dateTimeCallback(dateTime);
+    HAS_RTC = true;
+  }
+
+  ...
+}
+
+void dateTime(uint16_t* date, uint16_t* time) {
+  DateTime d = RTC.now();
+  *date = FAT_DATE(d.year(), d.month(), d.day());
+  *time = FAT_TIME(d.hour(), d.minute(), d.second());
+}
+```
+
+You'll notice that `RTC.adjust(...)` line: this line "resets" the RTC to a new date and time, because the odds that you bought an RTC that already has the correct time set is practically zero. As such, this line, when compiled and uploaded to your Arduino, replaces those `F(__DATE__)` and `F(__TIME__)` with the actual date and time when the code gets compiled. But, we only need to do this once: immediately after uploading the sketch to the Arduino, we take that line out and _recompile and upload the code again_.
+
+We also see a call that to `SdFile::dateTimeCallback(dateTime)`, which tells the SD card library that whenever it needs to get a date/time value, it can call our `dateTime` function to get those values.
+
+With that covered, we can now also update our MIDI marker code:
+
+```c++
+void writeMidiMarker() {
+  if (!file) return;
+
+  writeVarLen(file, getDelta());
+  file.write(0xFF);
+  file.write(0x06);
+
+  if (HAS_RTC) {
+    DateTime d = RTC.now();
+    byte len = 20;
+    writeVarLen(file, len);
+
+    char marker[len];
+    sprintf(
+      marker,
+      "%04d/%02d/%02d, %02d:%02d:%02d",
+      d.year(), d.month(), d.day(), d.hour(), d.minute(), d.second()
+    );
+    file.write(marker, len);
+  }
+
+  else {
+    // this is where we put the code we originally wrote.
+  }
+}
+```
+
+If we have an RTC available, rather than writing out a sequential number, we can write real date/time strings. We use `sprintf` to fill our marker label's char array with a string composed of RTC values, forming a string of the form "2021/01/15, 15:20:00" rather than a simple number "1", "2", etc. 
 
 
 ### Creating a new file when idling
