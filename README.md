@@ -497,12 +497,11 @@ We can improve our files and MIDI markers by adding the RTC to the mix, which wi
 1. give us real datetimes for our files, and
 1. letting us set MIDI markers with the actual time you pressed the marker button
 
-So let's make that happen. First, in order to talk to an RTC we need to include a RTC library. I say "a" because there are quite a few to pick from, but I used the Adafruit library, so let's stick with that:
+So let's make that happen. First, in order to talk to an RTC we need to include a RTC library. I say "a" because there are quite a few to pick from, but I used the [RTClib](https://www.arduino.cc/reference/en/libraries/rtclib/) library by [Adafruit](https://www.adafruit.com/), so let's stick with that.
 
 ```c++
 #include <SD.h>
 #include <MIDI.h>
-#include <Wire.h>
 #include <RTClib.h>
 
 RTC_DS3231 RTC;
@@ -515,7 +514,6 @@ And then in `setup` we can both initialise the RTC interface, as well as well th
 void setup() {
   ...
 
-  Wire.begin();
   if (RTC.begin()) {
     // This line is special: we only need it once, and after that we're deleting it:
     RTC.adjust(DateTime(F(__DATE__), F(__TIME__)));
