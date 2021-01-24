@@ -1,6 +1,6 @@
 # Creating a MIDI pass-through recorder
 
-If you've ever used audio software on the computer, you probably know that MIDI exists: a signalling protocol that allows controllers to control virtual instruments like synths. It's also the protocol used by real audio hardware to talk to each, and you can think of it as the language in which, rathar than communicating a fluctuating voltage signal or series of discrete sample values, devices talk about what is being done on them ("A4 got pressed", "F4 got released",  "the mod wheel moved down", etc).
+If you've ever used audio software on the computer, you probably know that MIDI exists: a signalling protocol that allows controllers to control virtual instruments like synths. It's also the protocol used by real audio hardware to talk to each, and you can think of it as the language in which, rather than communicating a fluctuating voltage signal or series of discrete sample values, devices talk about what is being done on them ("A4 got pressed", "F4 got released",  "the mod wheel moved down", etc).
 
 As such, there are two ways to record digital instruments (real or virtual): you can record the sound they're making, or you can record the MIDI events that cause them to make those sounds, and that's where things get interesting.
 
@@ -52,7 +52,7 @@ And of course, the bits that you'll get with pretty much any Arduino starter kit
 
 ### The MIDI part of our recorder
 
-We set up MIDI-In on the Arduino `RX<-0` pin, with MIDI-Thru tapping straight into signal that's getting sent to `RX<-0`, too. The only tricky bit about this is that MIDI signals are isolated from the rest of the circuitry via an optocoupler (which gets around ground loop problems by literally transmitting signals by running them through a LED, which emits the electrical signal as light, which then gets picked up by a phototransistor that turns the light back into an electrical signal). When placing and connecting the optocoupler, it is very important to make sure you know which pin is pin 1: it'll have a little mark next to it (typically a dot on the chip casing) to tell you that that side has pins 1 through 4 running top to bottom, and pins 5 through 8 on the other side _running bottom to top_. Also note that we're not using pins 1 and 4 for this circuit: only pins 2 and 3 are connected to the MIDI-In connector, and pins 5 through 8 are connected to the various arduino pins.
+We set up MIDI-In on the Arduino `RX<-0` pin, with MIDI-Thru tapping straight into signal that's getting sent to `RX<-0`, too. The only tricky bit about this is that MIDI signals are isolated from the rest of the circuitry via an optocoupler (which gets around ground loop problems by literally transmitting signals by running them through a LED, which emits the electrical signal as light, which then gets picked up by a phototransistor that turns the light back into an electrical signal). When placing and connecting the optocoupler, it is very important to make sure you know which pin is pin 1: it'll have a little mark next to it (typically a dot on the chip casing) to tell you that that side has pins 1 through 4 running top to bottom, and pins 5 through 8 on the other side _running bottom to top_. Also note that we're not using pins 1 and 4 for this circuit: only pins 2 and 3 are connected to the MIDI-In connector, and pins 5 through 8 are connected to the various Arduino pins.
 
 <a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/MIDI.jpg" target="_blank"><img alt="MIDI circuit diagram" src="./MIDI.png" width="75%"></a>
 
@@ -615,6 +615,8 @@ Importing markers is not possible.
 ### FL Studio 20 (Image-Line)
 
 Drag the `.mid` file onto the application background (_not_ the channel rack, and _not_ into a pattern). When prompted to save changes, say "no", then uncheck "start new project" in the MIDI import dialog, then hit "accept". This will create a new channel rack entry and placable pattern that you can assign a "real" instrument by dragging any VST/FL instrument onto the channel rack's import default to replace it.
+
+To view your automation data, place the import-associated pattern and open its piano roll, then use the "control" picker to select the control you want to see the automation for.
 
 Importing markers is not possible.
 
