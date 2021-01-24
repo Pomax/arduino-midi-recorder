@@ -18,13 +18,15 @@ So: if you want a MIDI recorder, you'll have to build one... and if you want to 
    1. [SD card](#the-sd-part-of-our-recorder)
    1. [MIDI marker button](#adding-a-midi-marker-button)
    1. [All the beep beeps](#adding-a-beep-for-debugging)
+   1. [Optional: the real time clock](#bonus-adding-a-real-time-clock)
 1. [The software](#the-software)
    1. [Basics](#program-basics)
    1. [MIDI handling](#midi-handling)
    1. [File management](#file-management)
    1. [Saving MIDI markers](#saving-midi-markers)
    1. [Making some beeps](#making-some-beeps)
-   1. [idle handling](#creating-a-new-file-when-idling)
+   1. [Optional: the real time clock](#adding-the-real-time-clock)
+   1. [Idle handling](#creating-a-new-file-when-idling)
    1. [A final helper script](#a-final-helper-script)
 1. [Importing MIDI data into your DAW](#importing-midi-data-into-your-daw)
 1. [Comments/questions](#comments-and-or-questions)
@@ -39,12 +41,14 @@ To build this, we're going to basically build a standard "MIDI-In + MIDI-Thru" c
 1. An Arduino SD card module (~$10 for a pack of five)
 1. Two female 5-pin DIN connectors (~$5 for a pack of ten)
 1. A 6N138 optocoupler (~$10 for a pack of ten)
+1. Optional: a DS3231-based RTC module
 
 And of course, the bits that you'll get with pretty much any Arduino starter kit:
 
 1. An Arduino UNO R3 or equivalent board
-1. 4x 220 ohm resistors
+1. 2x 220 ohm resistors
 1. 1x 4.7k ohm resistor
+1. 2x 10k ohm resistors
 1. A diode
 1. A piezo buzzer
 1. Two clicky pushy buttons
@@ -54,7 +58,7 @@ And of course, the bits that you'll get with pretty much any Arduino starter kit
 
 We set up MIDI-In on the Arduino `RX<-0` pin, with MIDI-Thru tapping straight into signal that's getting sent to `RX<-0`, too. The only tricky bit about this is that MIDI signals are isolated from the rest of the circuitry via an optocoupler (which gets around ground loop problems by literally transmitting signals by running them through a LED, which emits the electrical signal as light, which then gets picked up by a phototransistor that turns the light back into an electrical signal). When placing and connecting the optocoupler, it is very important to make sure you know which pin is pin 1: it'll have a little mark next to it (typically a dot on the chip casing) to tell you that that side has pins 1 through 4 running top to bottom, and pins 5 through 8 on the other side _running bottom to top_. Also note that we're not using pins 1 and 4 for this circuit: only pins 2 and 3 are connected to the MIDI-In connector, and pins 5 through 8 are connected to the various Arduino pins.
 
-<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/MIDI.jpg" target="_blank"><img alt="MIDI circuit diagram" src="./MIDI.png" width="75%"></a>
+<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/MIDI.png" target="_blank"><img alt="MIDI circuit diagram" src="./MIDI.png" width="75%"></a>
 
 (I know, "Thru isn't a word!", but that's what [the MIDI spec](http://www.shclemen.com/download/The%20Complete%20MIDI1.0%20Detailed%20Spec.pdf#page=7&zoom=auto,-206,478) calls it, so English gets to take a back seat here...)
 
@@ -65,21 +69,27 @@ The SD card circuitry is literally just a matter of "connect the pins to the pin
 
 However, note that your SD card module **may have a different pin layout** so be sure to double-check before wiring things up!
 
-<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/sd card.jpg" target="_blank"><img alt="SD module diagram" src="./sd card.png" width="50%"></a>
+<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/sd card.png" target="_blank"><img alt="SD module diagram" src="./sd card.png" width="50%"></a>
 
 ### Adding a MIDI marker button
 
 In order to make it easier to find particularly "worth revisiting" parts of what got recorded, we add a button that connects to pin 4, that we can use to write MIDI markers into our file. There is barely anything to this circuit:
 
-<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/button.jpg" target="_blank"><img alt="simple button diagram" src="./button.png" width="50%"></a>
+<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/button.png" target="_blank"><img alt="simple button diagram" src="./button.png" width="50%"></a>
 
 
 ### Adding a beep, for debugging
 
 And finally, we're going to add a little piezo speaker and a button that we can press to turn on (or off) playing a note corresponding to a MIDI note getting played, mostly as the audio equivalent of visual debugging. There's barely any work here: we hook up the "speaker" between pin 8 and ground, and the button to pin 2. Beep, beep!
 
-<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/beep.jpg" target="_blank"><img alt="beep beep button diagram" src="./beep.png" width="50%"></a>
+<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/beep.png" target="_blank"><img alt="beep beep button diagram" src="./beep.png" width="50%"></a>
 
+
+### Optional: adding a Real Time Clock
+
+Our last bit of circuitry is not required in the slightest, but it does improve usability quite a bit: a real-time clock using a DS3231 chip, which is a "fancy" RTC with some smart bits that keeps it accurate regardless of temperature changes. Connecting it is pretty straight forward, and uses some pins on the side of the Arduino we've not used yet, connecting the SDA (or "D") pin to the A4 input, and the SCL (or "C") pin to the A5 input. What will this get us? For one we the SD card library can make us of it to make sure files have a real file date, and secondly, it'll allow us to write MIDI markers that are linked to dates and times, rather than being a simple sequence number. Both these things will make it easier to find past work more easily.
+
+<a href="https://raw.githubusercontent.com/Pomax/arduino-midi-recorder/master/RTC.png" target="_blank"><img alt="DS3231 RTC diagram" src="./RTC.png" width="50%"></a>
 
 
 ## The Software
@@ -91,8 +101,9 @@ With the circuitry set up, let's start writing our program, focussing on dealing
 1. [Basic file writing (SD library)](#file-management)
 1. [Saving MIDI markers](#saving-midi-markers)
 1. [Audio debugging (beep beep)](#making-some-beeps)
-1. [Usability bonus: "clean restart" on idle](#creating-a-new-file-when-idling)
-1. [Usability bonus 2: "fix the track length" script](#a-final-helper-script)
+1. [Usability bonus: adding the real-time clock](#adding-the-real-time-clock)
+1. [Usability bonus 2: "clean restart" on idle](#creating-a-new-file-when-idling)
+1. [Final usability bonus: "fix the track length" script](#a-final-helper-script)
 
 
 ### Program basics
@@ -480,6 +491,88 @@ So now if we start our program, and we press our button, playing notes on our MI
 Beep, beep!
 
 
+### Adding the real time clock
+
+We can improve our files and MIDI markers by adding the RTC to the mix, which will do two things for us:
+
+1. give us real datetimes for our files, and
+1. letting us set MIDI markers with the actual time you pressed the marker button
+
+So let's make that happen. First, in order to talk to an RTC we need to include a RTC library. I say "a" because there are quite a few to pick from, but I used the [RTClib](https://www.arduino.cc/reference/en/libraries/rtclib/) library by [Adafruit](https://www.adafruit.com/), so let's stick with that.
+
+```c++
+#include <SD.h>
+#include <MIDI.h>
+#include <RTClib.h>
+
+RTC_DS3231 RTC;
+bool HAS_RTC = false;
+```
+
+And then in `setup` we can both initialise the RTC interface, as well as let the SD module know that there's now an RTC that it can ask for date/time information when it needs it:
+
+```C++
+void setup() {
+  ...
+
+  if (RTC.begin()) {
+    // This line is special: we only need it once, and after that we're deleting it:
+    RTC.adjust(DateTime(F(__DATE__), F(__TIME__)));
+
+    // if the RTC works, we can tell the SD library
+    // how it can check for the current time when it
+    // needs timestamping for file creation/writing.
+    SdFile::dateTimeCallback(dateTime);
+    HAS_RTC = true;
+  }
+
+  ...
+}
+
+void dateTime(uint16_t* date, uint16_t* time) {
+  DateTime d = RTC.now();
+  *date = FAT_DATE(d.year(), d.month(), d.day());
+  *time = FAT_TIME(d.hour(), d.minute(), d.second());
+}
+```
+
+You'll notice that `RTC.adjust(...)` line: this line "resets" the RTC to a new date and time, because the odds that you bought an RTC that already has the correct time set is practically zero. As such, this line, when compiled and uploaded to your Arduino, replaces those `F(__DATE__)` and `F(__TIME__)` with the actual date and time when the code gets compiled. But, we only need to do this once: immediately after uploading the sketch to the Arduino, we take that line out and _recompile and upload the code again_.
+
+We also see a call that to `SdFile::dateTimeCallback(dateTime)`, which tells the SD card library that whenever it needs to get a date/time value, it can call our `dateTime` function to get those values.
+
+With that covered, we can now also update our MIDI marker code:
+
+```c++
+void writeMidiMarker() {
+  if (!file) return;
+
+  writeVarLen(file, getDelta());
+  file.write(0xFF);
+  file.write(0x06);
+
+  if (HAS_RTC) {
+    DateTime d = RTC.now();
+    byte len = 20;
+    writeVarLen(file, len);
+
+    char marker[len];
+    sprintf(
+      marker,
+      "%04d/%02d/%02d, %02d:%02d:%02d",
+      d.year(), d.month(), d.day(), d.hour(), d.minute(), d.second()
+    );
+    file.write(marker, len);
+  }
+
+  else {
+    // this is where we put the code we originally wrote.
+  }
+}
+```
+
+If we have an RTC available, rather than writing out a sequential number, we can write real date/time strings. We use `sprintf` to fill our marker label's char array with a string composed of RTC values, forming a string of the form "2021/01/15, 15:20:00" rather than a simple number "1", "2", etc. 
+
+
 ### Creating a new file when idling
 
 There's one feature that's still missing... remember that the whole point of this recorder is to record the MIDI events that your MIDI-out device generates because you're using it. But what we _don't_ want it to do is "record an hour of silence because you stopped playing and went off to do something else for a bit"!
@@ -600,7 +693,7 @@ Drag the `.mid` file onto a track.
 
 To view your automation data, select and double-click the track to open its piano roll, and use the events buttons below the piano roll/above the events pane.
 
-Importing markers is _technically_ possible, but it might as well not be: see https://www.youtube.com/watch?v=Se1Anm1-yaw for how needlessly complicated this is.
+Importing markers is _technically_ possible, but it might as well not be: see [https://www.youtube.com/watch?v=Se1Anm1-yaw](https://www.youtube.com/watch?v=Se1Anm1-yaw) for how needlessly complicated this is.
 
 
 ### Ableton Live 10
@@ -614,7 +707,7 @@ Importing markers is not possible.
 
 ### FL Studio 20 (Image-Line)
 
-Drag the `.mid` file onto the application background (_not_ the channel rack, and _not_ into a pattern). When prompted to save changes, say "no", then uncheck "start new project" in the MIDI import dialog, then hit "accept". This will create a new channel rack entry and placable pattern that you can assign a "real" instrument by dragging any VST/FL instrument onto the channel rack's import default to replace it.
+Drag the `.mid` file onto the application background (_not_ onto the channel rack or into an open pattern). When prompted to save changes, say "no", then uncheck "start new project" in the MIDI import dialog, then hit "accept". This will create a new channel rack entry and placable pattern. To see your data, place the pattern in the playlist, and to assign the instrument you want to play that data, simply drag any VST/AU/FL instrument onto the channel rack entry that got built for your import.
 
 To view your automation data, place the import-associated pattern and open its piano roll, then use the "control" picker to select the control you want to see the automation for.
 
