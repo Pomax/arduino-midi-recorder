@@ -25,18 +25,26 @@
    for its full license text.
  ********************************************************/
 
+// File and MIDI handling
 #include <SD.h>
 #include <MIDI.h>
 
+// Our Real Time Clock
+#include <RTClib.h>
+RTC_DS3231 RTC;
+bool HAS_RTC = false;
+
+// Audio pins and values
+#define AUDIO 7
 #define AUDIO_DEBUG_PIN 2
 int lastPlayState = 0;
 bool play = false;
 
+// Marker pins and values
 #define PLACE_MARKER_PIN 4
 int lastMarkState = 0;
 int nextMarker = 1;
 
-#define AUDIO 8
 #define CHIP_SELECT 9
 #define HAS_MORE_BYTES 0x80
 
@@ -63,6 +71,7 @@ MIDI_CREATE_DEFAULT_INSTANCE();
    Set up our inline MIDI recorder
 */
 void setup() {
+  // set up MIDI handling
   MIDI.begin(MIDI_CHANNEL_OMNI);
   MIDI.setHandleNoteOn(handleNoteOn);
   MIDI.setHandleNoteOff(handleNoteOff);
@@ -71,24 +80,49 @@ void setup() {
 
   // set up the tone playing button
   pinMode(AUDIO_DEBUG_PIN, INPUT);
+  pinMode(AUDIO, OUTPUT);
+  // tone(AUDIO, 440, 200);
 
   // set up the MIDI marker button
   pinMode(PLACE_MARKER_PIN, INPUT);
 
+  // set up RTC interfacing
+  if (RTC.begin()) {
+    // uncomment this line to set the current date/time on the RTC
+    // RTC.adjust(DateTime(F(__DATE__), F(__TIME__)));
+
+    // if the RTC works, we can tell the SD library
+    // how it can check for the current time when it
+    // needs timestamping for file creation/writing.
+    SdFile::dateTimeCallback(dateTime);
+    HAS_RTC = true;
+    // tone(AUDIO, 880, 100);
+  }
+
   // set up SD card functionality and allocate a file
   pinMode(CHIP_SELECT, OUTPUT);
   if (SD.begin(CHIP_SELECT)) {
-    findNextFilename();
-    if (file) createMidiFile();
+    creatNextFile();
+    if (file) {
+      writeMidiPreamble();
+      // tone(AUDIO, 1760, 100);
+    }
   }
 }
+
+void dateTime(uint16_t* date, uint16_t* time) {
+  DateTime d = RTC.now();
+  *date = FAT_DATE(d.year(), d.month(), d.day());
+  *time = FAT_TIME(d.hour(), d.minute(), d.second());
+}
+
 
 /**
     We could use the EEPROM to store this number,
     but since we're not going to get timestamped
     files anyway, just looping is also fine.
 */
-void findNextFilename() {
+void creatNextFile() {
   for (int i = 1; i < 1000; i++) {
     filename = "file-";
     if (i < 10) filename += "0";
@@ -106,13 +140,13 @@ void findNextFilename() {
 /**
    Set up a new MIDI file with some boiler plate byte code
 */
-void createMidiFile() {
+void writeMidiPreamble() {
   byte header[] = {
     0x4D, 0x54, 0x68, 0x64,   // "MThd" chunk
     0x00, 0x00, 0x00, 0x06,   // chunk length (from this point on)
     0x00, 0x00,               // format 0
     0x00, 0x01,               // one track
-    0x01, 0xC2                // data rate = 450 ticks per quarter note
+    0x01, 0xD4                // data rate = 458 ticks per quarter note
   };
   file.write(header, 14);
 
@@ -125,7 +159,7 @@ void createMidiFile() {
   byte tempo[] = {
     0x00,                     // time delta (of zero)
     0xFF, 0x51, 0x03,         // tempo op code
-    0x06, 0xDD, 0xD0          // real rate = 450,000μs per quarter note (= 132 BPM)
+    0x06, 0xFD, 0x1F          // real rate = 458,015μs per quarter note (= 134681 BPM)
   };
   file.write(tempo, 7);
 }
@@ -172,7 +206,7 @@ void(* resetArduino) (void) = 0;
   if we've not received any data for 2 minutes, and we were
   previously recording, we reset the arduino so that when
   we start playing again, we'll be doing so in a new file,
-  rather than having multiple sessions with huge silence 
+  rather than having multiple sessions with huge silence
   between them in the same file.
 */
 void checkReset() {
@@ -193,7 +227,9 @@ void setPlayState() {
   int playState = digitalRead(AUDIO_DEBUG_PIN);
   if (playState != lastPlayState) {
     lastPlayState = playState;
-    if (playState == 1) play = !play;
+    if (playState == 1) {
+      play = !play;
+    }
   }
 }
 
@@ -227,17 +263,32 @@ void writeMidiMarker() {
   file.write(0xFF);
   file.write(0x06);
 
-  // how many letters are we writing?
-  byte len = 1;
-  if (nextMarker > 9) len++;
-  if (nextMarker > 99) len++;
-  if (nextMarker > 999) len++;
-  writeVarLen(file, len);
+  // If we have an RTC available, we can write the clock time
+  // Otherwise,  write a sequence number.
 
-  // our label:
-  byte marker[len];
-  String(nextMarker++).getBytes(marker, len);
-  file.write(marker, len);
+  if (HAS_RTC) {
+    DateTime d = RTC.now();
+    byte len = 20;
+    writeVarLen(file, len);
+
+    char marker[len]; // will hold strings like "2021/01/23, 10:53:31"
+    sprintf(marker, "%04d/%02d/%02d, %02d:%02d:%02d", d.year(), d.month(), d.day(), d.hour(), d.minute(), d.second());
+    file.write(marker, len);
+  }
+
+  else {
+    // how many letters are we writing?
+    byte len = 1;
+    if (nextMarker > 9) len++;
+    if (nextMarker > 99) len++;
+    if (nextMarker > 999) len++;
+    writeVarLen(file, len);
+
+    // our label:
+    byte marker[len];
+    String(nextMarker++).getBytes(marker, len);
+    file.write(marker, len);
+  }
 }
 
 
