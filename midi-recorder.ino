@@ -159,7 +159,7 @@ void writeMidiPreamble() {
   byte tempo[] = {
     0x00,                     // time delta (of zero)
     0xFF, 0x51, 0x03,         // tempo op code
-    0x06, 0xFD, 0x1F          // real rate = 458,015μs per quarter note (= 134681 BPM)
+    0x06, 0xFD, 0x1F          // real rate = 458,015μs per quarter note (= 134.681 BPM)
   };
   file.write(tempo, 7);
 }

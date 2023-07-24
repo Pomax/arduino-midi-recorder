@@ -570,7 +570,7 @@ void writeMidiMarker() {
 }
 ```
 
-If we have an RTC available, rather than writing out a sequential number, we can write real date/time strings. We use `sprintf` to fill our marker label's char array with a string composed of RTC values, forming a string of the form "2021/01/15, 15:20:00" rather than a simple number "1", "2", etc. 
+If we have an RTC available, rather than writing out a sequential number, we can write real date/time strings. We use `sprintf` to fill our marker label's char array with a string composed of RTC values, forming a string of the form "2021/01/15, 15:20:00" rather than a simple number "1", "2", etc.
 
 
 ### Creating a new file when idling
@@ -716,6 +716,6 @@ Importing markers is not possible.
 
 ## Comments and/or questions
 
-Hit up [the issue tracker](https://github.com/Pomax/arduino-midi-recorder/issues) if you want to have a detailed conversation, or just tweet/toot at me on [Twitter](https://twitter.com/TheRealPomax) or [Mastodon](https://mastodon.social/@TheRealPomax) if you want the kind of momentary engagement the internet seems to be for these days =)
+Hit up [the issue tracker](https://github.com/Pomax/arduino-midi-recorder/issues) if you want to have a detailed conversation, or reach out on [Mastodon](https://mastodon.social/@TheRealPomax) if you want the kind of momentary engagement the internet seems to be for these days =)
 
 — Pomax
