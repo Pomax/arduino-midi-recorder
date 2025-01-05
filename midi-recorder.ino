@@ -162,6 +162,9 @@ void writeMidiPreamble() {
     0x06, 0xFD, 0x1F          // real rate = 458,015μs per quarter note (= 134.681 BPM)
   };
   file.write(tempo, 7);
+
+  // zero out the timer for this file.
+  startTime = 0;
 }
 
 /**
